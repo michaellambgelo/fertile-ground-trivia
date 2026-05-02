@@ -36,6 +36,7 @@ The two windows talk via `BroadcastChannel` (channel name `star-wars-trivia`). S
 | `nav:prev`       | control → display | —                                                     |
 | `nav:goto`       | control → display | slide index                                           |
 | `slidechange`    | display → control | `{ index, total, label }`                             |
+| `pictures:update`| control → display | full pastes array (10 items, each `{ dataUrl, caption }`) |
 | `timer:toggle`   | control → display | — (toggles paused on active question slide)           |
 | `timer:reset`    | control → display | — (resets to full duration)                           |
 | `timer:adjust`   | control → display | delta seconds (+10, -10)                              |
@@ -48,6 +49,9 @@ The two windows talk via `BroadcastChannel` (channel name `star-wars-trivia`). S
 - `src/App.jsx` composes the slide list, holds a `useRef` on the `<deck-stage>`, listens for nav/content broadcasts, and forwards `slidechange` events to the control window.
 - `src/ControlApp.jsx` has two tabs (Presenter, Edit Questions). Editor edits are buffered (`dirty` flag) and only push to display when the user clicks Save.
 - `src/rounds.js` — `DEFAULT_ROUNDS` + `loadRounds`/`saveRounds`/`resetRounds`. Persists to `localStorage` under `star-wars-trivia.rounds`.
+- `src/pictures.js` — picture round data layer. `DEFAULT_PICTURE_ITEMS` always points to `/images/picture-NN.png` (the predictable on-disk paths). `loadPastes`/`savePastes`/`clearPastes` manage a 10-slot paste buffer in `localStorage` (`star-wars-trivia.pictures`). `mergeItems(pastes)` resolves what the display actually renders: pasted data URLs win over disk paths.
+- `src/handout.js` — pure-canvas PNG renderer for the picture round handout. White background, dark borders, "PICTURE ROUND" title, no recap eyebrow / no FooterBar. Exports `copyHandoutToClipboard`, `downloadHandoutPng`, `downloadAllImages` (per-cell downloads with predictable filenames). No html2canvas dependency.
+- The `<img>` cells in `PictureRoundRecap` use an `onError` fallback (`PictureRecapCell` in `slides.jsx`) so missing disk-path images degrade to the "PHOTO" placeholder instead of a broken-image icon.
 - `src/QuestionSlide` (in `slides.jsx`): tracks `isActive` from `slidechange` events, holds local `seconds` + `paused` state. Only the active slide responds to timer broadcasts and emits `timer:state`. All 40 mounted question slides see the broadcasts but only the active one acts.
 - `TWEAK_DEFAULTS` (in `App.jsx`) is wrapped in `/*EDITMODE-BEGIN*/ ... /*EDITMODE-END*/` markers — **do not remove**. The Claude Design host tool finds and rewrites this block on disk when a user adjusts tweaks via the panel.
 - `slides.jsx` is the design system: typography scale, accents, atmospheric overlays (Starfield, Halftone, Vignette), and 11 slide components. Inline styles only — no CSS files.

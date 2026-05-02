@@ -27,8 +27,17 @@ The two windows talk to each other live via `BroadcastChannel` (built-in browser
 2. Open a new browser window, navigate to `#/control`, drag it to your laptop screen.
 3. Drag the display window to the projector / second display, then make it fullscreen (browser fullscreen, e.g. ⌃⌘F on macOS Chrome).
 4. Use the control window to:
-   - **Edit Questions** — fill in real prompts; Save & Push to Display syncs them.
    - **Presenter** — Prev / Next / Reset, jump-to-slide via the slide list, control the question timer (pause / resume / reset / ±10s).
+   - **Edit Questions** — fill in real prompts; Save & Push to Display syncs them.
+   - **Picture Round** — paste images into 10 cells, copy or download the handout PNG, save the images to disk for production deployment.
+
+### Picture Round workflow
+
+1. In the control window, switch to the **Picture Round** tab.
+2. Click a cell, ⌘V (Mac) / Ctrl+V to paste an image from your clipboard. (Drag-drop a file works too.) Pastes go into `localStorage` so the display picks them up immediately.
+3. **Copy Handout to Clipboard** — copies a print-friendly 1920×1080 PNG (white background, dark borders, "PICTURE ROUND" title, no recap eyebrow). Paste into Word / Pages / email.
+4. **Download Handout PNG** — same image as a file.
+5. **Save Images to Disk** — downloads each pasted image with predictable names (`picture-01.png` … `picture-10.png`). Drop them into `public/images/` so the display can serve them statically and you can clear the localStorage paste buffer.
 
 ### Display controls (fallback)
 
@@ -47,15 +56,19 @@ Keyboard / mouse shortcuts on the display window itself, in case you don't want 
 src/
 ├── main.jsx            entry — picks display vs control by URL hash
 ├── App.jsx             display: slide composition + broadcast wiring
-├── ControlApp.jsx      control: editor + presenter view
-├── rounds.js           ROUNDS data + localStorage persistence
+├── ControlApp.jsx      control: presenter / editor / picture round tabs
+├── rounds.js           DEFAULT_ROUNDS + localStorage persistence
+├── pictures.js         picture round data + paste buffer
+├── handout.js          canvas-based PNG renderer for picture round handout
 ├── broadcast.js        BroadcastChannel helper + useBroadcast hook
 ├── deck-stage.js       custom element (vanilla JS)
-├── slides.jsx          11 slide components + design system
+├── slides.jsx          12 slide components + design system
 └── tweaks-panel.jsx    floating tweaks panel + useTweaks hook
 ```
 
 Round / question content lives in `src/rounds.js` as `DEFAULT_ROUNDS`. Edits made in the control window override the defaults via `localStorage` — they survive page reloads but stay local to the browser. To reset to defaults, click **Reset to Defaults** in the editor.
+
+Picture Round images live in `public/images/picture-01.png` … `picture-10.png` once you save them. Until then, pastes in the editor are kept in `localStorage` and the display reads from there.
 
 ## Tweaks panel
 

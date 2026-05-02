@@ -6,9 +6,10 @@ import {
 import {
   ACCENTS, TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide,
   RoundOpener, PictureRoundInstructions, IntermissionSlide, QuestionSlide,
-  RoundRecap, EndSlide,
+  RoundRecap, PictureRoundRecap, EndSlide,
 } from './slides.jsx';
 import { loadRounds } from './rounds.js';
+import { loadPastes, mergeItems } from './pictures.js';
 import { broadcast, useBroadcast } from './broadcast.js';
 
 // ============================================================
@@ -28,6 +29,8 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [rounds, setRounds] = useState(() => loadRounds());
+  const [pastes, setPastes] = useState(() => loadPastes());
+  const pictureItems = mergeItems(pastes);
   const accent = ACCENTS[tweaks.accent] || ACCENTS["saber-blue"];
   const stageRef = useRef(null);
 
@@ -35,6 +38,7 @@ function App() {
   useBroadcast(useCallback((msg) => {
     const stage = stageRef.current;
     if (msg.type === 'rounds:update') setRounds(msg.payload);
+    else if (msg.type === 'pictures:update') setPastes(msg.payload);
     else if (msg.type === 'nav:next') stage?.next();
     else if (msg.type === 'nav:prev') stage?.prev();
     else if (msg.type === 'nav:goto') stage?.goTo(msg.payload);
@@ -92,9 +96,19 @@ function App() {
   // 6. Round 1 instructions
   slides.push(<PictureRoundInstructions key="r1-instr" tweaks={tweaks} accent={accent} />);
 
-  // 7. Intermission to Round 2
+  // 7. Picture Round Recap — discussed right after the picture round, before R2
   slides.push(
-    <IntermissionSlide key="int-r2" label="07 Intermission · Before R2"
+    <PictureRoundRecap
+      key="r1-recap"
+      items={pictureItems}
+      tweaks={tweaks}
+      accent={accent}
+    />
+  );
+
+  // 8. Intermission to Round 2
+  slides.push(
+    <IntermissionSlide key="int-r2" label="08 Intermission · Before R2"
       nextRound={2} nextTitle="Original Trilogy"
       tweaks={tweaks} accent={accent}
     />

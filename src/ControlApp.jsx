@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS } from './rounds.js';
+import { loadPastes, savePastes, clearPastes, mergeItems, PICTURE_FILENAME } from './pictures.js';
+import { copyHandoutToClipboard, downloadHandoutPng, downloadAllImages } from './handout.js';
 import { broadcast, useBroadcast } from './broadcast.js';
 
 // ============================================================
@@ -28,6 +30,7 @@ const baseStyle = {
 // ============================================================
 export default function ControlApp() {
   const [rounds, setRounds] = useState(() => loadRounds());
+  const [pastes, setPastes] = useState(() => loadPastes());
   const [tab, setTab] = useState('present');
   const [currentSlide, setCurrentSlide] = useState({ index: 0, total: 0, label: '' });
   const [timer, setTimer] = useState({ seconds: 0, paused: false, enabled: false });
@@ -37,6 +40,12 @@ export default function ControlApp() {
     setRounds(next);
     saveRounds(next);
     broadcast('rounds:update', next);
+  }, []);
+
+  const commitPastes = useCallback((next) => {
+    setPastes(next);
+    savePastes(next);
+    broadcast('pictures:update', next);
   }, []);
 
   // Listen for slide / timer state coming back from the display window.
@@ -53,16 +62,23 @@ export default function ControlApp() {
   return (
     <div style={baseStyle}>
       <Header tab={tab} setTab={setTab} currentSlide={currentSlide} />
-      {tab === 'present' ? (
+      {tab === 'present' && (
         <PresenterPanel
           currentSlide={currentSlide}
           timer={timer}
           rounds={rounds}
         />
-      ) : (
+      )}
+      {tab === 'edit' && (
         <EditorPanel
           rounds={rounds}
           commitRounds={commitRounds}
+        />
+      )}
+      {tab === 'pictures' && (
+        <PicturesPanel
+          pastes={pastes}
+          commitPastes={commitPastes}
         />
       )}
     </div>
@@ -76,6 +92,7 @@ function Header({ tab, setTab, currentSlide }) {
   const tabs = [
     { id: 'present', label: 'Presenter' },
     { id: 'edit', label: 'Edit Questions' },
+    { id: 'pictures', label: 'Picture Round' },
   ];
   return (
     <header style={{
@@ -315,6 +332,208 @@ function EditorPanel({ rounds, commitRounds }) {
 }
 
 // ============================================================
+// PICTURES PANEL — paste images, preview, export to clipboard / disk
+// ============================================================
+function PicturesPanel({ pastes, commitPastes }) {
+  const [focusedCell, setFocusedCell] = useState(null);
+  const [status, setStatus] = useState('');
+  const items = useMemo(() => mergeItems(pastes), [pastes]);
+
+  const setStatusFlash = useCallback((msg) => {
+    setStatus(msg);
+    setTimeout(() => setStatus((s) => (s === msg ? '' : s)), 2400);
+  }, []);
+
+  const handlePaste = useCallback((i, e) => {
+    const clipItems = e.clipboardData?.items || [];
+    for (const item of clipItems) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = () => {
+          const next = pastes.map((p, idx) =>
+            idx === i ? { ...p, dataUrl: reader.result } : p
+          );
+          commitPastes(next);
+          setStatusFlash(`Pasted into cell ${String(i + 1).padStart(2, '0')}`);
+        };
+        reader.readAsDataURL(blob);
+        return;
+      }
+    }
+  }, [pastes, commitPastes, setStatusFlash]);
+
+  const handleDrop = useCallback((i, e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const next = pastes.map((p, idx) =>
+        idx === i ? { ...p, dataUrl: reader.result } : p
+      );
+      commitPastes(next);
+      setStatusFlash(`Loaded image into cell ${String(i + 1).padStart(2, '0')}`);
+    };
+    reader.readAsDataURL(file);
+  }, [pastes, commitPastes, setStatusFlash]);
+
+  const clearCell = (i) => {
+    const next = pastes.map((p, idx) =>
+      idx === i ? { dataUrl: null, caption: null } : p
+    );
+    commitPastes(next);
+  };
+
+  const clearAll = () => {
+    if (!confirm('Clear all pasted pictures? This will reset every cell.')) return;
+    clearPastes();
+    commitPastes(loadPastes());
+    setStatusFlash('All pastes cleared');
+  };
+
+  const onCopy = async () => {
+    try {
+      await copyHandoutToClipboard(items);
+      setStatusFlash('Handout copied to clipboard');
+    } catch (e) {
+      setStatusFlash(`Copy failed: ${e.message}`);
+    }
+  };
+
+  const onDownload = async () => {
+    try {
+      await downloadHandoutPng(items);
+      setStatusFlash('Handout PNG downloaded');
+    } catch (e) {
+      setStatusFlash(`Download failed: ${e.message}`);
+    }
+  };
+
+  const onSaveImages = async () => {
+    try {
+      const count = await downloadAllImages(items);
+      if (count === 0) setStatusFlash('No images to save — paste some first');
+      else setStatusFlash(`Downloaded ${count} image${count === 1 ? '' : 's'} → drop into public/images/`);
+    } catch (e) {
+      setStatusFlash(`Save failed: ${e.message}`);
+    }
+  };
+
+  return (
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title="Picture Round — paste images, then export">
+        <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 14 }}>
+          Click a cell to focus it, then ⌘V (Mac) / Ctrl+V to paste an image. Or drag-drop a file.
+          Pastes live in <code>localStorage</code>; click <strong>Save Images to Disk</strong> when done
+          to download them as <code>{PICTURE_FILENAME(0)}</code> … and drop them into <code>public/images/</code>.
+        </div>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12,
+          aspectRatio: `${1920 - 160} / ${1080 - 300}`,
+        }}>
+          {pastes.map((p, i) => (
+            <PictureCell
+              key={i}
+              i={i}
+              dataUrl={p.dataUrl}
+              fallbackSrc={items[i].src}
+              isPasted={items[i].isPasted}
+              focused={focusedCell === i}
+              onFocus={() => setFocusedCell(i)}
+              onPaste={(e) => handlePaste(i, e)}
+              onDrop={(e) => handleDrop(i, e)}
+              onClear={() => clearCell(i)}
+            />
+          ))}
+        </div>
+        <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Button onClick={onCopy} primary>Copy Handout to Clipboard</Button>
+          <Button onClick={onDownload}>Download Handout PNG</Button>
+          <Button onClick={onSaveImages}>Save Images to Disk</Button>
+          <Button onClick={clearAll} secondary>Clear All</Button>
+          {status && (
+            <span style={{ marginLeft: 8, fontSize: 12, color: COLORS.accent }}>
+              {status}
+            </span>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function PictureCell({ i, dataUrl, fallbackSrc, isPasted, focused, onFocus, onPaste, onDrop, onClear }) {
+  const ref = useRef(null);
+  const [diskFailed, setDiskFailed] = useState(false);
+  const showSrc = dataUrl || (!diskFailed ? fallbackSrc : null);
+  return (
+    <div
+      ref={ref}
+      tabIndex={0}
+      onFocus={onFocus}
+      onClick={() => ref.current?.focus()}
+      onPaste={onPaste}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={onDrop}
+      style={{
+        position: 'relative', aspectRatio: '1 / 1', borderRadius: 6,
+        border: `2px solid ${focused ? COLORS.accent : COLORS.border}`,
+        background: COLORS.bg, overflow: 'hidden', cursor: 'pointer',
+        outline: 'none',
+      }}
+    >
+      {showSrc ? (
+        <img
+          src={showSrc}
+          alt={`Picture ${i + 1}`}
+          onError={() => { if (!isPasted) setDiskFailed(true); }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: COLORS.textDim, fontSize: 11,
+          letterSpacing: '0.2em', textTransform: 'uppercase',
+        }}>
+          {focused ? 'Paste image' : 'Empty'}
+        </div>
+      )}
+      <div style={{
+        position: 'absolute', top: 6, left: 6,
+        width: 28, height: 28, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: 12, fontWeight: 700,
+        background: COLORS.accent, color: COLORS.bg, borderRadius: 4,
+        fontFamily: 'Oswald, sans-serif',
+      }}>
+        {String(i + 1).padStart(2, '0')}
+      </div>
+      {dataUrl && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onClear(); }}
+          style={{
+            position: 'absolute', top: 6, right: 6, width: 22, height: 22,
+            border: 0, borderRadius: 4, background: COLORS.danger, color: '#fff',
+            fontSize: 14, lineHeight: '20px', cursor: 'pointer',
+          }}
+        >×</button>
+      )}
+      {isPasted && (
+        <div style={{
+          position: 'absolute', bottom: 4, right: 6, fontSize: 9,
+          letterSpacing: '0.18em', textTransform: 'uppercase', color: COLORS.warn,
+          textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+        }}>
+          Pasted
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // PRIMITIVES
 // ============================================================
 function Card({ title, children, compact = false }) {
@@ -388,6 +607,7 @@ function buildSlideOutline(rounds) {
     { key: 'costume', label: 'Costume Contest' },
     { key: 'r1-open', label: 'Round 1 Opener — Picture Round' },
     { key: 'r1-instr', label: 'Round 1 Instructions' },
+    { key: 'r1-recap', label: 'Picture Round Recap (5×2 grid)' },
     { key: 'int-r2', label: 'Intermission · Before Round 2' },
   ];
   rounds.forEach((r, idx) => {

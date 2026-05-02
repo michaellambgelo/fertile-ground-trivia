@@ -325,7 +325,7 @@ function RulesSlide({ tweaks, accent }) {
     { n: "I",   t: "No phones",       d: "Looking up answers will result in points being deducted at the hosts' discretion." },
     { n: "II",  t: "Spelling is forgiving",  d: "Misspellings are fine as long as the answer is unambiguous and correct." },
     { n: "III", t: "Hosts are final",   d: "Jack and Michael have the last word on every ruling. No appeals to the High Council." },
-    { n: "IV",  t: "Have fun",         d: "It's a long time ago in a galaxy far, far away. Loosen up." },
+    { n: "IV",  t: "Have fun",         d: "It's a long time ago in a galaxy far, far away... You're allowed to be cheesy." },
   ];
   return (
     <section data-label="02 Rules">
@@ -1014,6 +1014,117 @@ function IntermissionSlide({ nextRound, nextTitle, tweaks, accent, label }) {
   );
 }
 
+function PictureRecapCell({ item, index, accent }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [item.src]);
+  const showImage = item.src && !failed;
+  return (
+    <div style={{
+      position: "relative",
+      background: `${PALETTE.paper}06`,
+      border: `2px solid ${accent.hex}33`,
+      borderRadius: 4,
+      overflow: "hidden",
+    }}>
+      {showImage ? (
+        <img
+          src={item.src}
+          alt={item.caption || `Picture ${index + 1}`}
+          onError={() => setFailed(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      ) : (
+        <div style={{
+          position: "absolute", inset: 8,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          border: `2px dashed ${PALETTE.paper}22`,
+          borderRadius: 2,
+        }}>
+          <div style={{
+            fontFamily: displayFont, fontSize: TYPE_SCALE.meta, fontWeight: 500,
+            color: PALETTE.paperDim, letterSpacing: "0.36em", opacity: 0.55,
+          }}>
+            PHOTO
+          </div>
+        </div>
+      )}
+      <div style={{
+        position: "absolute", top: 12, left: 12,
+        width: 56, height: 56,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: displayFont, fontWeight: 700, fontSize: 30,
+        color: PALETTE.ink, background: accent.hex,
+        boxShadow: `0 0 18px ${accent.glow}`,
+        borderRadius: 4, letterSpacing: "0.02em",
+      }}>
+        {String(index + 1).padStart(2, "0")}
+      </div>
+      {item.caption && (
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0,
+          padding: "10px 14px",
+          background: `linear-gradient(180deg, transparent, ${PALETTE.ink}cc)`,
+          fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 500,
+          color: PALETTE.paper, letterSpacing: "0.02em",
+        }}>
+          {item.caption}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// SLIDE: PICTURE ROUND RECAP
+// 5×2 grid for discussing picture round answers + serves as the print
+// design for the paper handout. Cells are placeholder boxes when item.src
+// is null; render an <img> when src is present.
+// ============================================================
+function PictureRoundRecap({ items, tweaks, accent }) {
+  return (
+    <section data-label="Picture Round Recap">
+      <div style={slideBase}>
+        <SlideAtmosphere tweaks={tweaks} accent={accent} />
+        <CornerMarks accentHex={accent.hex} />
+
+        <div style={{
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          height: "100%", display: "flex", flexDirection: "column",
+        }}>
+          <Eyebrow accentHex={accent.hex}>Round 01 · Recap</Eyebrow>
+          <div style={{
+            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
+            letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
+          }}>
+            PICTURE ROUND
+          </div>
+          <div style={{
+            height: 4, width: 180, background: accent.hex, marginTop: 22,
+            boxShadow: `0 0 16px ${accent.glow}`,
+          }} />
+
+          <div style={{
+            marginTop: 56, display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gridTemplateRows: "repeat(2, 1fr)",
+            gap: 24, flex: 1,
+          }}>
+            {items.map((item, i) => (
+              <PictureRecapCell key={i} item={item} index={i} accent={accent} />
+            ))}
+          </div>
+        </div>
+
+        <FooterBar
+          left="Picture Round · Recap"
+          right={`${items.length} Photos · Discuss Answers`}
+          accentHex={accent.hex}
+        />
+      </div>
+    </section>
+  );
+}
+
 // ============================================================
 // SLIDE: END
 // ============================================================
@@ -1061,7 +1172,7 @@ function EndSlide({ tweaks, accent }) {
 
 export {
   TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide, RoundOpener,
-  PictureRoundInstructions, QuestionSlide, RoundRecap,
+  PictureRoundInstructions, QuestionSlide, RoundRecap, PictureRoundRecap,
   IntermissionSlide, EndSlide,
   ACCENTS, DEFAULTS, PALETTE,
 };
