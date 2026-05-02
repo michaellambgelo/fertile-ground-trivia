@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { broadcast, useBroadcast } from './broadcast.js';
 
 // ============================================================
 // DESIGN SYSTEM — Retro pulp / vintage poster, saber-blue accent
@@ -458,6 +459,77 @@ function PrizeSlide({ tweaks, accent }) {
 }
 
 // ============================================================
+// SLIDE: COSTUME CONTEST
+// ============================================================
+function CostumeContestSlide({ tweaks, accent }) {
+  const rules = [
+    { n: "I",   t: "Open to All Sentients", d: "Any guest can enter — you don't need to be on a trivia team to win." },
+    { n: "II",  t: "Galactic Canon",        d: "Costumes must be Star Wars themed. Original concepts welcome if the connection is clear." },
+    { n: "III", t: "Hosts Decide",          d: "Jack and Michael will pick Best Overall. No appeals to the High Council." },
+    { n: "IV",  t: "A Separate Bounty",     d: "One winner takes home a side prize, revealed before the trivia champion is crowned." },
+  ];
+  return (
+    <section data-label="04 Costume Contest">
+      <div style={slideBase}>
+        <SlideAtmosphere tweaks={tweaks} accent={accent} />
+        <CornerMarks accentHex={accent.hex} />
+
+        <div style={{
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          height: "100%", display: "flex", flexDirection: "column",
+        }}>
+          <Eyebrow accentHex={accent.hex}>Bonus Challenge</Eyebrow>
+          <div style={{
+            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
+            letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
+          }}>
+            COSTUME CONTEST
+          </div>
+          <div style={{
+            height: 4, width: 180, background: accent.hex, marginTop: 22,
+            boxShadow: `0 0 16px ${accent.glow}`,
+          }} />
+
+          <div style={{
+            marginTop: 64, display: "grid", gridTemplateColumns: "1fr 1fr",
+            gap: "44px 80px", flex: 1,
+          }}>
+            {rules.map((r) => (
+              <div key={r.n} style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
+                <div style={{
+                  fontFamily: displayFont, fontWeight: 700, fontSize: 80, lineHeight: 0.9,
+                  color: accent.hex, minWidth: 96,
+                  textShadow: `0 0 18px ${accent.glow}`,
+                }}>
+                  {r.n}
+                </div>
+                <div>
+                  <div style={{
+                    fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
+                    letterSpacing: "0.04em", color: PALETTE.paper, marginBottom: 12,
+                  }}>
+                    {r.t}
+                  </div>
+                  <div style={{
+                    fontFamily: "'Inter', sans-serif", fontWeight: 400,
+                    fontSize: TYPE_SCALE.body, lineHeight: 1.35, color: PALETTE.paperDim,
+                    maxWidth: 560,
+                  }}>
+                    {r.d}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <FooterBar left="Costume Contest" right="Judged at End of Night" accentHex={accent.hex} />
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
 // SLIDE: ROUND OPENER (large numeral, theme)
 // ============================================================
 function RoundOpener({ number, title, subtitle, kicker, tweaks, accent, label }) {
@@ -635,12 +707,57 @@ function PictureRoundInstructions({ tweaks, accent }) {
 // ============================================================
 function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent }) {
   const [seconds, setSeconds] = useState(tweaks.timerSeconds || 30);
+  const [paused, setPaused] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   const ref = useRef(null);
 
+  // Track whether this slide is the active one in <deck-stage>.
+  // deck-stage sets data-deck-active on the active <section> and dispatches a
+  // bubbling, composed `slidechange` event we can listen for on document.
   useEffect(() => {
-    if (!tweaks.showTimer) return;
-    setSeconds(tweaks.timerSeconds || 30);
-  }, [tweaks.showTimer, tweaks.timerSeconds, q, round]);
+    const mySection = ref.current?.closest('section');
+    if (!mySection) return;
+    setIsActive(mySection.hasAttribute('data-deck-active'));
+    const handler = (e) => setIsActive(e.detail.slide === mySection);
+    document.addEventListener('slidechange', handler);
+    return () => document.removeEventListener('slidechange', handler);
+  }, []);
+
+  // Reset to full duration (and unpause) when this slide becomes active or
+  // timer settings change.
+  useEffect(() => {
+    if (isActive) {
+      setSeconds(tweaks.timerSeconds || 30);
+      setPaused(false);
+    }
+  }, [isActive, tweaks.timerSeconds, tweaks.showTimer]);
+
+  // Tick down once per second while active, enabled, not paused, and > 0.
+  useEffect(() => {
+    if (!tweaks.showTimer || !isActive || paused || seconds <= 0) return;
+    const t = setTimeout(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [tweaks.showTimer, isActive, paused, seconds]);
+
+  // Respond to control-window commands (only the active slide acts).
+  useBroadcast(useCallback((msg) => {
+    if (!isActive) return;
+    if (msg.type === 'timer:toggle') setPaused((p) => !p);
+    else if (msg.type === 'timer:reset') {
+      setSeconds(tweaks.timerSeconds || 30);
+      setPaused(false);
+    } else if (msg.type === 'timer:adjust') {
+      setSeconds((s) => Math.max(0, s + msg.payload));
+    } else if (msg.type === 'sync:request') {
+      broadcast('timer:state', { enabled: !!tweaks.showTimer, seconds, paused });
+    }
+  }, [isActive, tweaks.timerSeconds, tweaks.showTimer, seconds, paused]));
+
+  // Push timer state to the control window whenever it changes.
+  useEffect(() => {
+    if (!isActive) return;
+    broadcast('timer:state', { enabled: !!tweaks.showTimer, seconds, paused });
+  }, [isActive, seconds, paused, tweaks.showTimer]);
 
   return (
     <section data-label={`R${round} Q${String(q).padStart(2, "0")}`}>
@@ -676,12 +793,14 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent }) 
                 {roundTitle}
               </div>
             )}
-            <div style={{
-              fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
-              letterSpacing: "0.42em", color: PALETTE.paperDim,
-            }}>
-              {roundTitle}
-            </div>
+            {!tweaks.showTimer && (
+              <div style={{
+                fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
+                letterSpacing: "0.42em", color: PALETTE.paperDim,
+              }}>
+                {roundTitle}
+              </div>
+            )}
           </div>
 
           {/* Big numeral + prompt */}
@@ -912,14 +1031,14 @@ function EndSlide({ tweaks, accent }) {
         }}>
           <Eyebrow accentHex={accent.hex}>End of Game</Eyebrow>
           <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 280, lineHeight: 0.9,
+            fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
             color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 36,
             textShadow: `0 0 50px ${accent.glow}`,
           }}>
             MAY THE FORCE
           </div>
           <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 280, lineHeight: 0.9,
+            fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
             color: accent.hex, letterSpacing: "0.04em",
             textShadow: `0 0 50px ${accent.glow}`,
           }}>
@@ -941,7 +1060,7 @@ function EndSlide({ tweaks, accent }) {
 }
 
 export {
-  TitleSlide, RulesSlide, PrizeSlide, RoundOpener,
+  TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide, RoundOpener,
   PictureRoundInstructions, QuestionSlide, RoundRecap,
   IntermissionSlide, EndSlide,
   ACCENTS, DEFAULTS, PALETTE,

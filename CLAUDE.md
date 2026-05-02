@@ -18,14 +18,45 @@ npm run preview  # serve built bundle
 npm run lint     # ESLint
 ```
 
+## Two modes: display + control
+
+The app has two views, switched by URL hash:
+
+- `/` (or any non-`#/control` hash) → `App.jsx` (display)
+- `/#/control` → `ControlApp.jsx` (editor + presenter view)
+
+`src/main.jsx` reads `window.location.hash` and renders the appropriate root. A `hashchange` listener triggers full reload so each mode boots cleanly.
+
+The two windows talk via `BroadcastChannel` (channel name `star-wars-trivia`). See `src/broadcast.js` for the helper. Message types in use:
+
+| type             | direction        | payload                                               |
+|------------------|------------------|-------------------------------------------------------|
+| `rounds:update`  | control → display | full rounds array                                     |
+| `nav:next`       | control → display | —                                                     |
+| `nav:prev`       | control → display | —                                                     |
+| `nav:goto`       | control → display | slide index                                           |
+| `slidechange`    | display → control | `{ index, total, label }`                             |
+| `timer:toggle`   | control → display | — (toggles paused on active question slide)           |
+| `timer:reset`    | control → display | — (resets to full duration)                           |
+| `timer:adjust`   | control → display | delta seconds (+10, -10)                              |
+| `timer:state`    | display → control | `{ enabled, seconds, paused }`                        |
+| `sync:request`   | control → display | — (control just mounted; display re-emits state)      |
+
 ## Architecture notes
 
 - `src/main.jsx` imports `./deck-stage.js` for side effect — this registers the `<deck-stage>` custom element before React mounts.
-- `src/App.jsx` composes the slide list and holds `ROUNDS` (content) + `TWEAK_DEFAULTS`.
-- `TWEAK_DEFAULTS` is wrapped in `/*EDITMODE-BEGIN*/ ... /*EDITMODE-END*/` markers — **do not remove**. The Claude Design host tool finds and rewrites this block on disk when a user adjusts tweaks via the panel.
+- `src/App.jsx` composes the slide list, holds a `useRef` on the `<deck-stage>`, listens for nav/content broadcasts, and forwards `slidechange` events to the control window.
+- `src/ControlApp.jsx` has two tabs (Presenter, Edit Questions). Editor edits are buffered (`dirty` flag) and only push to display when the user clicks Save.
+- `src/rounds.js` — `DEFAULT_ROUNDS` + `loadRounds`/`saveRounds`/`resetRounds`. Persists to `localStorage` under `star-wars-trivia.rounds`.
+- `src/QuestionSlide` (in `slides.jsx`): tracks `isActive` from `slidechange` events, holds local `seconds` + `paused` state. Only the active slide responds to timer broadcasts and emits `timer:state`. All 40 mounted question slides see the broadcasts but only the active one acts.
+- `TWEAK_DEFAULTS` (in `App.jsx`) is wrapped in `/*EDITMODE-BEGIN*/ ... /*EDITMODE-END*/` markers — **do not remove**. The Claude Design host tool finds and rewrites this block on disk when a user adjusts tweaks via the panel.
 - `slides.jsx` is the design system: typography scale, accents, atmospheric overlays (Starfield, Halftone, Vignette), and 11 slide components. Inline styles only — no CSS files.
-- `tweaks-panel.jsx` owns the postMessage host protocol (`__activate_edit_mode`, `__deactivate_edit_mode`, `__edit_mode_set_keys`). The panel won't appear standalone — it requires a parent frame to activate it.
+- `tweaks-panel.jsx` owns its own postMessage host protocol (`__activate_edit_mode`, `__deactivate_edit_mode`, `__edit_mode_set_keys`). The panel won't appear standalone — it requires a parent frame to activate it. This is **not** the same channel as the BroadcastChannel above.
 - All slide components stay mounted with `visibility: hidden` so input/timer/video state survives navigation.
+
+## Slide outline duplication
+
+`ControlApp.jsx`'s `buildSlideOutline()` mirrors `App.jsx`'s slide composition by hand. If you add or reorder slides in `App.jsx`, update `buildSlideOutline()` to match — otherwise the slide list in the presenter view drifts out of sync with what the display actually shows.
 
 ## Lint warnings
 
@@ -33,7 +64,7 @@ npm run lint     # ESLint
 
 ## Content
 
-Trivia questions in `src/App.jsx` `ROUNDS` array are placeholder text. Real questions go there. 4 themed rounds × 10 questions = 40 question slides, plus the picture round (paper, no slides), openers, recaps, and intermissions = ~58 slides total.
+`DEFAULT_ROUNDS` in `src/rounds.js` ships with placeholder strings (40 questions across 4 themed rounds). Real content can be entered through the `/#/control` editor (saved to `localStorage`) or by editing `DEFAULT_ROUNDS` directly. Total slide count: ~59 (title, rules, prize, costume contest, R1 opener, R1 instructions, intermission, then for each of rounds 2–5: opener + 10 questions + recap + (intermission unless final), then end).
 
 ## What this project is NOT
 

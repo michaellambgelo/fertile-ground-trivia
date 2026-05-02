@@ -1,50 +1,15 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useTweaks, TweaksPanel, TweakSection,
   TweakSlider, TweakToggle, TweakRadio,
 } from './tweaks-panel.jsx';
 import {
-  ACCENTS, TitleSlide, RulesSlide, PrizeSlide, RoundOpener,
-  PictureRoundInstructions, IntermissionSlide, QuestionSlide,
+  ACCENTS, TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide,
+  RoundOpener, PictureRoundInstructions, IntermissionSlide, QuestionSlide,
   RoundRecap, EndSlide,
 } from './slides.jsx';
-
-// ============================================================
-// CONTENT — placeholder questions, easy to swap later
-// ============================================================
-const ROUNDS = [
-  {
-    n: 2, title: "Original Trilogy",
-    subtitle: "Episodes IV, V, and VI — the films that started it all.",
-    kicker: "10 Questions",
-    questions: Array.from({ length: 10 }, (_, i) =>
-      `Question ${i + 1} for Round 2 · Original Trilogy. Replace this placeholder with your real prompt.`
-    ),
-  },
-  {
-    n: 3, title: "Prequel Era",
-    subtitle: "The Republic, the Jedi Council, and the rise of the Empire.",
-    kicker: "10 Questions",
-    questions: Array.from({ length: 10 }, (_, i) =>
-      `Question ${i + 1} for Round 3 · Prequel Era. Replace this placeholder with your real prompt.`
-    ),
-  },
-  {
-    n: 4, title: "Quotes & Catchphrases",
-    subtitle: "Who said it — and to whom?",
-    kicker: "10 Questions",
-    questions: Array.from({ length: 10 }, (_, i) =>
-      `Question ${i + 1} for Round 4 · Quotes & Catchphrases. Replace this placeholder with your real prompt.`
-    ),
-  },
-  {
-    n: 5, title: "Deep Cuts",
-    subtitle: "For the diehards. Spinoffs, side characters, and obscure lore.",
-    kicker: "10 Questions · Tiebreaker Material",
-    questions: Array.from({ length: 10 }, (_, i) =>
-      `Question ${i + 1} for Round 5 · Deep Cuts. Replace this placeholder with your real prompt.`
-    ),
-  },
-];
+import { loadRounds } from './rounds.js';
+import { broadcast, useBroadcast } from './broadcast.js';
 
 // ============================================================
 // EDITMODE TWEAK DEFAULTS
@@ -62,7 +27,40 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 // ============================================================
 function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [rounds, setRounds] = useState(() => loadRounds());
   const accent = ACCENTS[tweaks.accent] || ACCENTS["saber-blue"];
+  const stageRef = useRef(null);
+
+  // Receive content + nav commands from the /control window.
+  useBroadcast(useCallback((msg) => {
+    const stage = stageRef.current;
+    if (msg.type === 'rounds:update') setRounds(msg.payload);
+    else if (msg.type === 'nav:next') stage?.next();
+    else if (msg.type === 'nav:prev') stage?.prev();
+    else if (msg.type === 'nav:goto') stage?.goTo(msg.payload);
+    else if (msg.type === 'sync:request' && stage) {
+      const slide = stage.querySelector('section[data-deck-active]');
+      broadcast('slidechange', describeSlide(stage, slide));
+      // QuestionSlide responds with its own timer:state if it's the active slide.
+    }
+  }, []));
+
+  // Forward slide changes to the /control window.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const handler = (e) => {
+      broadcast('slidechange', describeSlide(stage, e.detail.slide, e.detail));
+      // Clear timer state when leaving any non-question slide so control's
+      // timer card shows OFF instead of stale numbers.
+      const label = e.detail.slide?.getAttribute('data-label') || '';
+      if (!/^R\d+ Q\d+/.test(label)) {
+        broadcast('timer:state', { enabled: false, seconds: 0, paused: false });
+      }
+    };
+    stage.addEventListener('slidechange', handler);
+    return () => stage.removeEventListener('slidechange', handler);
+  }, []);
 
   const slides = [];
 
@@ -75,11 +73,14 @@ function App() {
   // 3. Prize
   slides.push(<PrizeSlide key="prize" tweaks={tweaks} accent={accent} />);
 
-  // 4. Round 1 opener
+  // 4. Costume Contest
+  slides.push(<CostumeContestSlide key="costume" tweaks={tweaks} accent={accent} />);
+
+  // 5. Round 1 opener
   slides.push(
     <RoundOpener
       key="r1-open"
-      label="04 Round 1 Opener"
+      label="05 Round 1 Opener"
       number={1}
       title="Picture Round"
       subtitle="A galaxy of faces, ships, and places. Played from a paper sheet handed out by the hosts."
@@ -88,19 +89,19 @@ function App() {
     />
   );
 
-  // 5. Round 1 instructions
+  // 6. Round 1 instructions
   slides.push(<PictureRoundInstructions key="r1-instr" tweaks={tweaks} accent={accent} />);
 
-  // 6. Intermission to Round 2
+  // 7. Intermission to Round 2
   slides.push(
-    <IntermissionSlide key="int-r2" label="06 Intermission · Before R2"
+    <IntermissionSlide key="int-r2" label="07 Intermission · Before R2"
       nextRound={2} nextTitle="Original Trilogy"
       tweaks={tweaks} accent={accent}
     />
   );
 
   // Rounds 2-5
-  ROUNDS.forEach((r, idx) => {
+  rounds.forEach((r, idx) => {
     slides.push(
       <RoundOpener
         key={`r${r.n}-open`}
@@ -140,8 +141,8 @@ function App() {
     );
 
     // Intermission after rounds 2, 3, 4 (not after final round)
-    if (idx < ROUNDS.length - 1) {
-      const next = ROUNDS[idx + 1];
+    if (idx < rounds.length - 1) {
+      const next = rounds[idx + 1];
       slides.push(
         <IntermissionSlide
           key={`int-${next.n}`}
@@ -160,7 +161,7 @@ function App() {
 
   return (
     <>
-      <deck-stage width="1920" height="1080">
+      <deck-stage ref={stageRef} width="1920" height="1080">
         {slides}
       </deck-stage>
 
@@ -207,6 +208,13 @@ function App() {
       </TweaksPanel>
     </>
   );
+}
+
+function describeSlide(stage, slide, detail) {
+  const total = detail?.total ?? stage.length;
+  const index = detail?.index ?? stage.index;
+  const label = slide?.getAttribute('data-label') || `Slide ${index + 1}`;
+  return { index, total, label };
 }
 
 export default App;
