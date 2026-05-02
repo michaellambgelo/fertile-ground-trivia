@@ -1,5 +1,4 @@
-/* global React */
-const { useState, useEffect, useRef } = React;
+import React, { useState, useEffect, useRef } from 'react';
 
 // ============================================================
 // DESIGN SYSTEM — Retro pulp / vintage poster, saber-blue accent
@@ -941,10 +940,9 @@ function EndSlide({ tweaks, accent }) {
   );
 }
 
-// Export to window for the main script
-Object.assign(window, {
+export {
   TitleSlide, RulesSlide, PrizeSlide, RoundOpener,
   PictureRoundInstructions, QuestionSlide, RoundRecap,
   IntermissionSlide, EndSlide,
   ACCENTS, DEFAULTS, PALETTE,
-});
+};

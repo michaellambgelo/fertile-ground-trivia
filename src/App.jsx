@@ -1,35 +1,12 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>Star Wars Trivia · Fertile Ground</title>
-<meta name="viewport" content="width=1920" />
-
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-
-<style>
-  html, body { margin: 0; padding: 0; background: #06080F; color: #F2E9D8; font-family: 'Inter', system-ui, sans-serif; }
-  * { box-sizing: border-box; }
-  ::selection { background: #5BC8FF; color: #0B0E1A; }
-  /* deck-stage children inherit absolute positioning — the stage handles layout */
-</style>
-
-<script src="deck-stage.js"></script>
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-</head>
-<body>
-
-<div id="root"></div>
-
-<script type="text/babel" src="tweaks-panel.jsx"></script>
-<script type="text/babel" src="slides.jsx"></script>
-
-<script type="text/babel">
-const { useState, useEffect } = React;
+import {
+  useTweaks, TweaksPanel, TweakSection,
+  TweakSlider, TweakToggle, TweakRadio,
+} from './tweaks-panel.jsx';
+import {
+  ACCENTS, TitleSlide, RulesSlide, PrizeSlide, RoundOpener,
+  PictureRoundInstructions, IntermissionSlide, QuestionSlide,
+  RoundRecap, EndSlide,
+} from './slides.jsx';
 
 // ============================================================
 // CONTENT — placeholder questions, easy to swap later
@@ -232,8 +209,4 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-</script>
-
-</body>
-</html>
+export default App;
