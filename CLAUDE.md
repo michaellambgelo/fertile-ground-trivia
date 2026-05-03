@@ -37,6 +37,7 @@ The two windows talk via `BroadcastChannel` (channel name `star-wars-trivia`). S
 | `nav:goto`       | control → display | slide index                                           |
 | `slidechange`    | display → control | `{ index, total, label }`                             |
 | `pictures:update`| control → display | full pastes array (10 items, each `{ dataUrl, caption, position: {x, y} }`) |
+| `tiebreakers:update`| control → display | array of 3 tiebreaker prompt strings |
 | `timer:toggle`   | control → display | — (toggles paused on active question slide)           |
 | `timer:reset`    | control → display | — (resets to full duration)                           |
 | `timer:adjust`   | control → display | delta seconds (+10, -10)                              |
@@ -48,7 +49,7 @@ The two windows talk via `BroadcastChannel` (channel name `star-wars-trivia`). S
 - `src/main.jsx` imports `./deck-stage.js` for side effect — this registers the `<deck-stage>` custom element before React mounts.
 - `src/App.jsx` composes the slide list, holds a `useRef` on the `<deck-stage>`, listens for nav/content broadcasts, and forwards `slidechange` events to the control window.
 - `src/ControlApp.jsx` has two tabs (Presenter, Edit Questions). Editor edits are buffered (`dirty` flag) and only push to display when the user clicks Save.
-- `src/rounds.js` — `DEFAULT_ROUNDS` + `loadRounds`/`saveRounds`/`resetRounds`. Persists to `localStorage` under `star-wars-trivia.rounds`.
+- `src/rounds.js` — `DEFAULT_ROUNDS` + `loadRounds`/`saveRounds`/`resetRounds`. Persists to `localStorage` under `star-wars-trivia.rounds`. Also exports `DEFAULT_TIEBREAKERS` (3 sudden-death prompts) + `loadTiebreakers`/`saveTiebreakers`/`resetTiebreakers` (key `star-wars-trivia.tiebreakers`).
 - `src/pictures.js` — picture round data layer. `DEFAULT_PICTURE_ITEMS` always points to `/images/picture-NN.png` (the predictable on-disk paths). `loadPastes`/`savePastes`/`clearPastes` manage a 10-slot paste buffer in `localStorage` (`star-wars-trivia.pictures`). Paste shape: `{ dataUrl, caption, position: { x, y } }` where `x`/`y` are 0-100 percentages (default 50/50 = centered, matches `object-position: center`). `loadPastes` migrates pre-crop entries forward by defaulting missing `position`. `mergeItems(pastes)` resolves what the display actually renders: pasted data URLs win over disk paths, position falls back to centered.
 - `src/handout.js` — pure-canvas PNG renderer for the picture round handout. White background, dark borders, "PICTURE ROUND" title, no recap eyebrow / no FooterBar. Geometry constants (margins, gap, grid bounds, answer-area height) mirror the slide so the same image crops the same way in both surfaces. Honors `position` via the same percentage math as `object-position`. Exports `copyHandoutToClipboard`, `downloadHandoutPng`, `downloadAllImages`. No html2canvas dependency.
 - The `<img>` cells in `PictureRoundRecap` use an `onError` fallback (`PictureRecapCell` in `slides.jsx`) so missing disk-path images degrade to the "PHOTO" placeholder instead of a broken-image icon. They apply `objectPosition: ${x}% ${y}%` from the merged item position.
@@ -69,7 +70,11 @@ The two windows talk via `BroadcastChannel` (channel name `star-wars-trivia`). S
 
 ## Content
 
-`DEFAULT_ROUNDS` in `src/rounds.js` ships with placeholder strings (40 questions across 4 themed rounds). Real content can be entered through the `/#/control` editor (saved to `localStorage`) or by editing `DEFAULT_ROUNDS` directly. Total slide count: ~59 (title, rules, prize, costume contest, R1 opener, R1 instructions, intermission, then for each of rounds 2–5: opener + 10 questions + recap + (intermission unless final), then end).
+`DEFAULT_ROUNDS` in `src/rounds.js` ships with placeholder strings (40 questions across 4 themed rounds). Real content can be entered through the `/#/control` editor (saved to `localStorage`) or by editing `DEFAULT_ROUNDS` directly. Same pattern for `DEFAULT_TIEBREAKERS` (3 sudden-death prompts).
+
+Total slide count: ~64. Order: title, rules, prize, costume contest, R1 opener, R1 instructions, picture round recap, intermission to R2, then for each of rounds 2–5: opener + 10 questions + recap + (intermission unless final), then tiebreaker intro + 3 tiebreaker question slides, then end.
+
+`QuestionSlide` accepts a `kind` prop (`"round"` default, `"tiebreaker"` for sudden death). Tiebreaker variant changes the header text from "ROUND XX · QUESTION YY · OF ZZ" to "TIEBREAKER · QUESTION YY · OF ZZ", changes the FooterBar to "Sudden Death" / "Tiebreaker YY / ZZ", and uses `data-label="TIEBREAKER YY"` so `App.jsx`'s slidechange regex (`/^(R\d+ Q\d+|TIEBREAKER \d+)/`) keeps the timer enabled on tiebreaker slides like it does on regular question slides.
 
 ## What this project is NOT
 

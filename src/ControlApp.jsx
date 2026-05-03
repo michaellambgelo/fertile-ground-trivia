@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS } from './rounds.js';
+import {
+  loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS,
+  loadTiebreakers, saveTiebreakers, resetTiebreakers, DEFAULT_TIEBREAKERS,
+} from './rounds.js';
 import { loadPastes, savePastes, clearPastes, mergeItems, PICTURE_FILENAME } from './pictures.js';
 import { copyHandoutToClipboard, downloadHandoutPng, downloadAllImages } from './handout.js';
 import { broadcast, useBroadcast } from './broadcast.js';
@@ -30,6 +33,7 @@ const baseStyle = {
 // ============================================================
 export default function ControlApp() {
   const [rounds, setRounds] = useState(() => loadRounds());
+  const [tiebreakers, setTiebreakers] = useState(() => loadTiebreakers());
   const [pastes, setPastes] = useState(() => loadPastes());
   const [tab, setTab] = useState('present');
   const [currentSlide, setCurrentSlide] = useState({ index: 0, total: 0, label: '' });
@@ -40,6 +44,12 @@ export default function ControlApp() {
     setRounds(next);
     saveRounds(next);
     broadcast('rounds:update', next);
+  }, []);
+
+  const commitTiebreakers = useCallback((next) => {
+    setTiebreakers(next);
+    saveTiebreakers(next);
+    broadcast('tiebreakers:update', next);
   }, []);
 
   const commitPastes = useCallback((next) => {
@@ -67,12 +77,15 @@ export default function ControlApp() {
           currentSlide={currentSlide}
           timer={timer}
           rounds={rounds}
+          tiebreakers={tiebreakers}
         />
       )}
       {tab === 'edit' && (
         <EditorPanel
           rounds={rounds}
+          tiebreakers={tiebreakers}
           commitRounds={commitRounds}
+          commitTiebreakers={commitTiebreakers}
         />
       )}
       {tab === 'pictures' && (
@@ -138,8 +151,8 @@ function Header({ tab, setTab, currentSlide }) {
 // ============================================================
 // PRESENTER PANEL — nav + timer + slide list
 // ============================================================
-function PresenterPanel({ currentSlide, timer, rounds }) {
-  const slideList = useMemo(() => buildSlideOutline(rounds), [rounds]);
+function PresenterPanel({ currentSlide, timer, rounds, tiebreakers }) {
+  const slideList = useMemo(() => buildSlideOutline(rounds, tiebreakers), [rounds, tiebreakers]);
 
   return (
     <div style={{
@@ -264,15 +277,19 @@ function SlideList({ slideList, currentIndex }) {
 // ============================================================
 // EDITOR PANEL — long form, edit metadata + questions
 // ============================================================
-function EditorPanel({ rounds, commitRounds }) {
+function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
   const [draft, setDraft] = useState(rounds);
+  const [draftTiebreakers, setDraftTiebreakers] = useState(tiebreakers);
   const [dirty, setDirty] = useState(false);
 
-  // If the persisted rounds change externally (e.g. another window saved), pull them in
-  // — but only when not editing.
+  // If the persisted data changes externally (e.g. another window saved), pull
+  // it in — but only when not editing, to avoid clobbering in-flight edits.
   useEffect(() => {
     if (!dirty) setDraft(rounds);
   }, [rounds, dirty]);
+  useEffect(() => {
+    if (!dirty) setDraftTiebreakers(tiebreakers);
+  }, [tiebreakers, dirty]);
 
   const update = (path, value) => {
     setDirty(true);
@@ -285,14 +302,32 @@ function EditorPanel({ rounds, commitRounds }) {
     });
   };
 
-  const save = () => { commitRounds(draft); setDirty(false); };
-  const revert = () => { setDraft(rounds); setDirty(false); };
-  const reset = () => {
-    if (!confirm('Reset all questions to the original placeholders? This will discard your edits.')) return;
-    resetRounds();
-    setDraft(loadRounds());
+  const updateTiebreaker = (i, value) => {
+    setDirty(true);
+    setDraftTiebreakers((tb) => tb.map((t, idx) => (idx === i ? value : t)));
+  };
+
+  const save = () => {
+    commitRounds(draft);
+    commitTiebreakers(draftTiebreakers);
     setDirty(false);
-    commitRounds(loadRounds());
+  };
+  const revert = () => {
+    setDraft(rounds);
+    setDraftTiebreakers(tiebreakers);
+    setDirty(false);
+  };
+  const reset = () => {
+    if (!confirm('Reset all questions and tiebreakers to the original placeholders? This will discard your edits.')) return;
+    resetRounds();
+    resetTiebreakers();
+    const freshRounds = loadRounds();
+    const freshTiebreakers = loadTiebreakers();
+    setDraft(freshRounds);
+    setDraftTiebreakers(freshTiebreakers);
+    setDirty(false);
+    commitRounds(freshRounds);
+    commitTiebreakers(freshTiebreakers);
   };
 
   return (
@@ -327,6 +362,21 @@ function EditorPanel({ rounds, commitRounds }) {
           ))}
         </Card>
       ))}
+      <Card title="Tiebreakers — Sudden Death">
+        <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 8 }}>
+          Used after the final round if there's a tie. Same prompt format as round questions.
+        </div>
+        {draftTiebreakers.map((t, i) => (
+          <Field
+            key={i}
+            label={`TB${i + 1}`}
+            value={t}
+            onChange={(v) => updateTiebreaker(i, v)}
+            multiline
+            compact
+          />
+        ))}
+      </Card>
     </div>
   );
 }
@@ -676,7 +726,7 @@ function Field({ label, value, onChange, multiline = false, compact = false }) {
 // can show a meaningful slide list and previews without rendering the slides.
 // Keep this in sync with App.jsx's slide composition.
 // ============================================================
-function buildSlideOutline(rounds) {
+function buildSlideOutline(rounds, tiebreakers = []) {
   const list = [
     { key: 'title', label: 'Title — May the Fourth' },
     { key: 'rules', label: 'House Rules' },
@@ -702,9 +752,17 @@ function buildSlideOutline(rounds) {
       list.push({ key: `int-${next.n}`, label: `Intermission · Before Round ${next.n}` });
     }
   });
+  list.push({ key: 'tb-intro', label: 'Tiebreakers — Sudden Death Rules' });
+  tiebreakers.forEach((prompt, i) => {
+    list.push({
+      key: `tb-q${i + 1}`,
+      label: `Tiebreaker · Question ${i + 1} / ${tiebreakers.length}`,
+      detail: prompt,
+    });
+  });
   list.push({ key: 'end', label: 'End — May the Force Be With You' });
   return list;
 }
 
-// Make DEFAULT_ROUNDS importable for fallback rendering during initial load.
-export { DEFAULT_ROUNDS };
+// Make defaults importable for fallback rendering during initial load.
+export { DEFAULT_ROUNDS, DEFAULT_TIEBREAKERS };

@@ -6,9 +6,9 @@ import {
 import {
   ACCENTS, TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide,
   RoundOpener, PictureRoundInstructions, IntermissionSlide, QuestionSlide,
-  RoundRecap, PictureRoundRecap, EndSlide,
+  RoundRecap, PictureRoundRecap, TiebreakerIntroSlide, EndSlide,
 } from './slides.jsx';
-import { loadRounds } from './rounds.js';
+import { loadRounds, loadTiebreakers } from './rounds.js';
 import { loadPastes, mergeItems } from './pictures.js';
 import { broadcast, useBroadcast } from './broadcast.js';
 
@@ -30,6 +30,7 @@ function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [rounds, setRounds] = useState(() => loadRounds());
   const [pastes, setPastes] = useState(() => loadPastes());
+  const [tiebreakers, setTiebreakers] = useState(() => loadTiebreakers());
   const pictureItems = mergeItems(pastes);
   const accent = ACCENTS[tweaks.accent] || ACCENTS["saber-blue"];
   const stageRef = useRef(null);
@@ -39,6 +40,7 @@ function App() {
     const stage = stageRef.current;
     if (msg.type === 'rounds:update') setRounds(msg.payload);
     else if (msg.type === 'pictures:update') setPastes(msg.payload);
+    else if (msg.type === 'tiebreakers:update') setTiebreakers(msg.payload);
     else if (msg.type === 'nav:next') stage?.next();
     else if (msg.type === 'nav:prev') stage?.prev();
     else if (msg.type === 'nav:goto') stage?.goTo(msg.payload);
@@ -56,9 +58,10 @@ function App() {
     const handler = (e) => {
       broadcast('slidechange', describeSlide(stage, e.detail.slide, e.detail));
       // Clear timer state when leaving any non-question slide so control's
-      // timer card shows OFF instead of stale numbers.
+      // timer card shows OFF instead of stale numbers. Question slides
+      // (regular rounds + tiebreakers) keep the timer; everything else clears.
       const label = e.detail.slide?.getAttribute('data-label') || '';
-      if (!/^R\d+ Q\d+/.test(label)) {
+      if (!/^(R\d+ Q\d+|TIEBREAKER \d+)/.test(label)) {
         broadcast('timer:state', { enabled: false, seconds: 0, paused: false });
       }
     };
@@ -168,6 +171,24 @@ function App() {
         />
       );
     }
+  });
+
+  // Tiebreakers — sudden-death after the final round, only used if there's a tie.
+  slides.push(<TiebreakerIntroSlide key="tb-intro" tweaks={tweaks} accent={accent} />);
+  tiebreakers.forEach((prompt, i) => {
+    slides.push(
+      <QuestionSlide
+        key={`tb-q${i + 1}`}
+        kind="tiebreaker"
+        round={5}
+        q={i + 1}
+        total={tiebreakers.length}
+        prompt={prompt}
+        roundTitle="Sudden Death"
+        tweaks={tweaks}
+        accent={accent}
+      />
+    );
   });
 
   // End

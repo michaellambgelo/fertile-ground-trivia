@@ -69,7 +69,7 @@ src/
 └── tweaks-panel.jsx    floating tweaks panel + useTweaks hook
 ```
 
-Round / question content lives in `src/rounds.js` as `DEFAULT_ROUNDS`. Edits made in the control window override the defaults via `localStorage` — they survive page reloads but stay local to the browser. To reset to defaults, click **Reset to Defaults** in the editor.
+Round / question content lives in `src/rounds.js` as `DEFAULT_ROUNDS`. Tiebreaker prompts live alongside as `DEFAULT_TIEBREAKERS` (3 sudden-death questions used after Round 5 if there's a tie). Edits made in the control window override the defaults via `localStorage` — they survive page reloads but stay local to the browser. To reset to defaults, click **Reset to Defaults** in the editor.
 
 Picture Round images live in `public/images/picture-01.png` … `picture-10.png` once you save them. Until then, pastes in the editor are kept in `localStorage` and the display reads from there.
 

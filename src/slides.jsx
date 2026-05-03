@@ -705,7 +705,8 @@ function PictureRoundInstructions({ tweaks, accent }) {
 // ============================================================
 // SLIDE: QUESTION
 // ============================================================
-function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent }) {
+function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, kind = "round" }) {
+  const isTiebreaker = kind === "tiebreaker";
   const [seconds, setSeconds] = useState(tweaks.timerSeconds || 30);
   const [paused, setPaused] = useState(false);
   const [isActive, setIsActive] = useState(false);
@@ -759,8 +760,12 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent }) 
     broadcast('timer:state', { enabled: !!tweaks.showTimer, seconds, paused });
   }, [isActive, seconds, paused, tweaks.showTimer]);
 
+  const dataLabel = isTiebreaker
+    ? `TIEBREAKER ${String(q).padStart(2, "0")}`
+    : `R${round} Q${String(q).padStart(2, "0")}`;
+
   return (
-    <section data-label={`R${round} Q${String(q).padStart(2, "0")}`}>
+    <section data-label={dataLabel}>
       <div style={slideBase} ref={ref}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
@@ -779,7 +784,7 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent }) 
                 fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
                 letterSpacing: "0.42em", color: accent.hex,
               }}>
-                ROUND {String(round).padStart(2, "0")}
+                {isTiebreaker ? "TIEBREAKER" : `ROUND ${String(round).padStart(2, "0")}`}
                 <span style={{ color: PALETTE.paperDim, margin: "0 18px" }}>·</span>
                 QUESTION {String(q).padStart(2, "0")}
                 <span style={{ color: PALETTE.paperDim, margin: "0 18px" }}>·</span>
@@ -860,8 +865,10 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent }) 
         </div>
 
         <FooterBar
-          left={`Round ${String(round).padStart(2, "0")}`}
-          right={`Question ${String(q).padStart(2, "0")} / ${String(total).padStart(2, "0")}`}
+          left={isTiebreaker ? "Sudden Death" : `Round ${String(round).padStart(2, "0")}`}
+          right={isTiebreaker
+            ? `Tiebreaker ${String(q).padStart(2, "0")} / ${String(total).padStart(2, "0")}`
+            : `Question ${String(q).padStart(2, "0")} / ${String(total).padStart(2, "0")}`}
           accentHex={accent.hex}
         />
       </div>
@@ -1140,6 +1147,77 @@ function PictureRoundRecap({ items, tweaks, accent }) {
 }
 
 // ============================================================
+// SLIDE: TIEBREAKER INTRO — sudden-death rules
+// ============================================================
+function TiebreakerIntroSlide({ tweaks, accent }) {
+  const rules = [
+    { n: "I",   t: "Pick a Team",            d: "A team is selected at random — or by rock-paper-scissors — to receive the question first." },
+    { n: "II",  t: "First Correct Wins",     d: "If that team answers correctly, they win the night. Game over." },
+    { n: "III", t: "Pass on a Miss",         d: "If they're wrong, the next team gets a shot at the same question." },
+    { n: "IV",  t: "Next Question if Stumped", d: "If no team can answer, we move to the next tiebreaker — and keep going until someone wins." },
+  ];
+  return (
+    <section data-label="Tiebreakers · Sudden Death">
+      <div style={slideBase}>
+        <SlideAtmosphere tweaks={tweaks} accent={accent} />
+        <CornerMarks accentHex={accent.hex} />
+
+        <div style={{
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          height: "100%", display: "flex", flexDirection: "column",
+        }}>
+          <Eyebrow accentHex={accent.hex}>Round 05 · Sudden Death</Eyebrow>
+          <div style={{
+            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
+            letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
+          }}>
+            TIEBREAKERS
+          </div>
+          <div style={{
+            height: 4, width: 180, background: accent.hex, marginTop: 22,
+            boxShadow: `0 0 16px ${accent.glow}`,
+          }} />
+
+          <div style={{
+            marginTop: 64, display: "grid", gridTemplateColumns: "1fr 1fr",
+            gap: "44px 80px", flex: 1,
+          }}>
+            {rules.map((r) => (
+              <div key={r.n} style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
+                <div style={{
+                  fontFamily: displayFont, fontWeight: 700, fontSize: 80, lineHeight: 0.9,
+                  color: accent.hex, minWidth: 96,
+                  textShadow: `0 0 18px ${accent.glow}`,
+                }}>
+                  {r.n}
+                </div>
+                <div>
+                  <div style={{
+                    fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
+                    letterSpacing: "0.04em", color: PALETTE.paper, marginBottom: 12,
+                  }}>
+                    {r.t}
+                  </div>
+                  <div style={{
+                    fontFamily: "'Inter', sans-serif", fontWeight: 400,
+                    fontSize: TYPE_SCALE.body, lineHeight: 1.35, color: PALETTE.paperDim,
+                    maxWidth: 560,
+                  }}>
+                    {r.d}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <FooterBar left="Sudden Death" right="First Correct Answer Wins" accentHex={accent.hex} />
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
 // SLIDE: END
 // ============================================================
 function EndSlide({ tweaks, accent }) {
@@ -1187,6 +1265,6 @@ function EndSlide({ tweaks, accent }) {
 export {
   TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide, RoundOpener,
   PictureRoundInstructions, QuestionSlide, RoundRecap, PictureRoundRecap,
-  IntermissionSlide, EndSlide,
+  IntermissionSlide, TiebreakerIntroSlide, EndSlide,
   ACCENTS, DEFAULTS, PALETTE,
 };

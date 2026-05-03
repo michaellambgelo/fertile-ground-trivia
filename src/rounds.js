@@ -2,6 +2,9 @@
 // Edits made in the /control window save here; both windows read from here.
 
 const STORAGE_KEY = 'star-wars-trivia.rounds';
+const TIEBREAKER_STORAGE_KEY = 'star-wars-trivia.tiebreakers';
+
+export const TIEBREAKER_COUNT = 3;
 
 export const DEFAULT_ROUNDS = [
   {
@@ -58,4 +61,33 @@ export function saveRounds(rounds) {
 
 export function resetRounds() {
   localStorage.removeItem(STORAGE_KEY);
+}
+
+// ---- Tiebreakers ---------------------------------------------------------
+// Sudden-death questions used after the final round when teams are tied.
+// 3 placeholders by default; editable via the control window's editor.
+
+export const DEFAULT_TIEBREAKERS = Array.from({ length: TIEBREAKER_COUNT }, (_, i) =>
+  `Tiebreaker question ${i + 1}. Replace this placeholder with your real prompt.`
+);
+
+export function loadTiebreakers() {
+  try {
+    const raw = localStorage.getItem(TIEBREAKER_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length === TIEBREAKER_COUNT) return parsed;
+    }
+  } catch {
+    // fall through
+  }
+  return [...DEFAULT_TIEBREAKERS];
+}
+
+export function saveTiebreakers(tiebreakers) {
+  localStorage.setItem(TIEBREAKER_STORAGE_KEY, JSON.stringify(tiebreakers));
+}
+
+export function resetTiebreakers() {
+  localStorage.removeItem(TIEBREAKER_STORAGE_KEY);
 }
