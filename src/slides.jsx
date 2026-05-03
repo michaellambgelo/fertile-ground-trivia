@@ -919,27 +919,27 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex =
             boxShadow: `0 0 14px ${accent.glow}` }} />
 
           <div style={{
-            marginTop: 36, flex: 1, display: "flex", flexDirection: "column",
-            gap: 18, overflow: "hidden",
+            marginTop: 28, flex: 1, display: "flex", flexDirection: "column",
+            gap: 12, overflow: "hidden",
           }}>
             {questions.map((q, i) => (
               <div key={i} style={{
-                display: "flex", gap: 28, alignItems: "baseline",
-                paddingBottom: 14, borderBottom: `1px solid ${PALETTE.paper}1A`,
+                display: "flex", gap: 24, alignItems: "baseline",
+                paddingBottom: 10, borderBottom: `1px solid ${PALETTE.paper}1A`,
                 minWidth: 0,
               }}>
                 <div style={{
-                  fontFamily: displayFont, fontWeight: 700, fontSize: 48,
-                  color: accent.hex, letterSpacing: "0.04em", minWidth: 72,
+                  fontFamily: displayFont, fontWeight: 700, fontSize: 40,
+                  color: accent.hex, letterSpacing: "0.04em", minWidth: 60,
                   textShadow: `0 0 10px ${accent.glow}`,
                   flex: "0 0 auto",
                 }}>
                   {String(startIndex + i + 1).padStart(2, "0")}
                 </div>
                 <div style={{
-                  fontFamily: "'Inter', sans-serif", fontSize: 28, lineHeight: 1.32,
+                  fontFamily: "'Inter', sans-serif", fontSize: 22, lineHeight: 1.28,
                   color: PALETTE.paper, fontWeight: 400,
-                  flex: 1, minWidth: 0, maxWidth: 1500,
+                  flex: 1, minWidth: 0, maxWidth: 1600,
                 }}>
                   {q}
                 </div>
