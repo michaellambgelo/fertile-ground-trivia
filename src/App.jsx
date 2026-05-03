@@ -146,12 +146,27 @@ function App() {
       );
     });
 
+    // Two recap slides per round, 5 questions each, so prompts can wrap fully.
     slides.push(
       <RoundRecap
-        key={`r${r.n}-recap`}
+        key={`r${r.n}-recap-a`}
         round={r.n}
         roundTitle={r.title}
-        questions={r.questions}
+        questions={r.questions.slice(0, 5)}
+        startIndex={0}
+        totalQuestions={r.questions.length}
+        tweaks={tweaks}
+        accent={accent}
+      />
+    );
+    slides.push(
+      <RoundRecap
+        key={`r${r.n}-recap-b`}
+        round={r.n}
+        roundTitle={r.title}
+        questions={r.questions.slice(5, 10)}
+        startIndex={5}
+        totalQuestions={r.questions.length}
         tweaks={tweaks}
         accent={accent}
       />
@@ -173,7 +188,12 @@ function App() {
     }
   });
 
-  // Tiebreakers — sudden-death after the final round, only used if there's a tie.
+  // End — normal sequential close. Tiebreakers live past this slide, only
+  // reached by hitting Next when there's an actual tie at the end of play.
+  slides.push(<EndSlide key="end" tweaks={tweaks} accent={accent} />);
+
+  // Tiebreakers — sudden-death after the End slide. Skip past these unless
+  // teams are tied; advance into them only when needed.
   slides.push(<TiebreakerIntroSlide key="tb-intro" tweaks={tweaks} accent={accent} />);
   tiebreakers.forEach((prompt, i) => {
     slides.push(
@@ -190,9 +210,6 @@ function App() {
       />
     );
   });
-
-  // End
-  slides.push(<EndSlide key="end" tweaks={tweaks} accent={accent} />);
 
   return (
     <>

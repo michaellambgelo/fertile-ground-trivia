@@ -746,13 +746,16 @@ function buildSlideOutline(rounds, tiebreakers = []) {
         detail: prompt,
       });
     });
-    list.push({ key: `r${r.n}-recap`, label: `Round ${r.n} Recap — ${r.title}` });
+    list.push({ key: `r${r.n}-recap-a`, label: `Round ${r.n} Recap A — Q01–05` });
+    list.push({ key: `r${r.n}-recap-b`, label: `Round ${r.n} Recap B — Q06–10` });
     if (idx < rounds.length - 1) {
       const next = rounds[idx + 1];
       list.push({ key: `int-${next.n}`, label: `Intermission · Before Round ${next.n}` });
     }
   });
-  list.push({ key: 'tb-intro', label: 'Tiebreakers — Sudden Death Rules' });
+  list.push({ key: 'end', label: 'End — May the Force Be With You' });
+  // Tiebreakers live past the End slide and are only reached if needed.
+  list.push({ key: 'tb-intro', label: 'Tiebreakers — Sudden Death (only if tied)' });
   tiebreakers.forEach((prompt, i) => {
     list.push({
       key: `tb-q${i + 1}`,
@@ -760,7 +763,6 @@ function buildSlideOutline(rounds, tiebreakers = []) {
       detail: prompt,
     });
   });
-  list.push({ key: 'end', label: 'End — May the Force Be With You' });
   return list;
 }
 

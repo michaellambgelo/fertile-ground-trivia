@@ -877,13 +877,17 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, ki
 }
 
 // ============================================================
-// SLIDE: ROUND RECAP — 2 columns of 5
+// SLIDE: ROUND RECAP — single column of 5 questions
+// One round produces two of these slides (questions 1–5, then 6–10) so
+// each prompt can wrap fully without being truncated.
 // ============================================================
-function RoundRecap({ round, roundTitle, questions, tweaks, accent }) {
-  const left = questions.slice(0, 5);
-  const right = questions.slice(5, 10);
+function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex = 0, totalQuestions = 10 }) {
+  const start = startIndex + 1;
+  const end = startIndex + questions.length;
+  const part = startIndex === 0 ? "A" : "B";
+  const showFooterHint = end >= totalQuestions; // only on the last recap of the round
   return (
-    <section data-label={`R${round} Recap`}>
+    <section data-label={`R${round} Recap ${part}`}>
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
@@ -907,7 +911,7 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent }) {
               fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
               letterSpacing: "0.4em", color: PALETTE.paperDim,
             }}>
-              ALL 10 QUESTIONS
+              QUESTIONS {String(start).padStart(2, "0")}–{String(end).padStart(2, "0")}
             </div>
           </div>
 
@@ -915,29 +919,27 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent }) {
             boxShadow: `0 0 14px ${accent.glow}` }} />
 
           <div style={{
-            marginTop: 36, flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr",
-            gridAutoRows: "min-content",
-            gap: "14px 56px", alignContent: "start", overflow: "hidden",
+            marginTop: 36, flex: 1, display: "flex", flexDirection: "column",
+            gap: 18, overflow: "hidden",
           }}>
             {questions.map((q, i) => (
               <div key={i} style={{
-                display: "flex", gap: 22, alignItems: "baseline",
-                paddingBottom: 12, borderBottom: `1px solid ${PALETTE.paper}1A`,
+                display: "flex", gap: 28, alignItems: "baseline",
+                paddingBottom: 14, borderBottom: `1px solid ${PALETTE.paper}1A`,
                 minWidth: 0,
               }}>
                 <div style={{
-                  fontFamily: displayFont, fontWeight: 700, fontSize: 40,
-                  color: accent.hex, letterSpacing: "0.04em", minWidth: 58,
+                  fontFamily: displayFont, fontWeight: 700, fontSize: 48,
+                  color: accent.hex, letterSpacing: "0.04em", minWidth: 72,
                   textShadow: `0 0 10px ${accent.glow}`,
                   flex: "0 0 auto",
                 }}>
-                  {String(i + 1).padStart(2, "0")}
+                  {String(startIndex + i + 1).padStart(2, "0")}
                 </div>
                 <div style={{
-                  fontFamily: "'Inter', sans-serif", fontSize: 24, lineHeight: 1.28,
+                  fontFamily: "'Inter', sans-serif", fontSize: 28, lineHeight: 1.32,
                   color: PALETTE.paper, fontWeight: 400,
-                  display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                  overflow: "hidden", flex: 1, minWidth: 0,
+                  flex: 1, minWidth: 0, maxWidth: 1500,
                 }}>
                   {q}
                 </div>
@@ -945,16 +947,18 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent }) {
             ))}
           </div>
 
-          <div style={{
-            marginTop: 18, fontFamily: displayFont, fontSize: TYPE_SCALE.small,
-            color: PALETTE.paperDim, letterSpacing: "0.32em", textTransform: "uppercase",
-          }}>
-            Hand answer sheets to the hosts before we move on.
-          </div>
+          {showFooterHint && (
+            <div style={{
+              marginTop: 18, fontFamily: displayFont, fontSize: TYPE_SCALE.small,
+              color: PALETTE.paperDim, letterSpacing: "0.32em", textTransform: "uppercase",
+            }}>
+              Hand answer sheets to the hosts before we move on.
+            </div>
+          )}
         </div>
 
         <FooterBar
-          left={`Round ${String(round).padStart(2, "0")} · Recap`}
+          left={`Round ${String(round).padStart(2, "0")} · Recap ${part}`}
           right={roundTitle}
           accentHex={accent.hex}
         />
