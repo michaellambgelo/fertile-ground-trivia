@@ -8,8 +8,9 @@
 import { PICTURE_FILENAME } from './pictures.js';
 
 // Page geometry — mirrors the on-screen PictureRoundRecap slide so the same
-// image crops the same way in both surfaces. Margins, gaps, and cell
-// dimensions match the deck's SPACING + TYPE_SCALE constants.
+// image crops the same way in both surfaces. Margins, gaps, and per-cell
+// dimensions match the deck's SPACING + TYPE_SCALE constants and the slide
+// PictureRecapCell's fixed photo-box aspect ratio.
 const W = 1920;
 const H = 1080;
 const MARGIN_X = 120;                            // matches slide paddingX
@@ -17,13 +18,15 @@ const TITLE_Y = 100;                             // matches slide paddingTop
 const TITLE_HEIGHT = 96;
 const RULE_Y = TITLE_Y + TITLE_HEIGHT + 14;      // 210
 const INSTRUCTION_Y = RULE_Y + 32;               // 242
-const GRID_TOP = INSTRUCTION_Y + 80;             // 322
-const GRID_BOTTOM = H - 90;                      // 990 — matches slide paddingBottom
 const GAP = 24;                                  // matches slide grid gap
 const COLS = 5;
 const ROWS = 2;
-// Each cell is split into a photo box (top) and an answer area (bottom),
-// matching the slide's PictureRecapCell flex column.
+void ROWS;  // referenced via items.length / COLS in the loop, kept for documentation
+// Each cell is split into a photo box (top, fixed aspect 316/220) and an
+// answer area (bottom). Same dimensions as the slide PictureRecapCell so the
+// same objectPosition produces the same visible crop on both surfaces.
+const PHOTO_ASPECT_W = 316;
+const PHOTO_ASPECT_H = 220;
 const ANSWER_HEIGHT = 56;                        // matches slide answer-line area
 const PHOTO_GAP = 14;                            // matches slide gap between photo and answer
 const ANSWER_LINE_THICKNESS = 2;
@@ -77,13 +80,14 @@ export async function renderHandoutCanvas(items) {
   ctx.textBaseline = 'top';
   ctx.fillText('Identify the character or creature.', MARGIN_X, INSTRUCTION_Y);
 
-  // Cell geometry — each row is split into a photo box (most of the height)
-  // and an answer area below (writing space with a rule at the bottom).
+  // Cell geometry — derive everything from the cell width (set by COLS+GAP)
+  // and the fixed photo-box aspect, so the printed handout's cells match the
+  // on-screen slide's cells exactly.
   const gridW = W - MARGIN_X * 2;
-  const gridH = GRID_BOTTOM - GRID_TOP;
   const cellW = (gridW - GAP * (COLS - 1)) / COLS;
-  const rowH = (gridH - GAP * (ROWS - 1)) / ROWS;
-  const photoH = rowH - ANSWER_HEIGHT - PHOTO_GAP;
+  const photoH = cellW * (PHOTO_ASPECT_H / PHOTO_ASPECT_W);
+  const rowH = photoH + PHOTO_GAP + ANSWER_HEIGHT;
+  const GRID_TOP = INSTRUCTION_Y + 80;            // ~322; leaves headroom under the instruction
 
   // Pre-load every image (parallel)
   const images = await Promise.all(items.map((it) => loadImage(it.src)));

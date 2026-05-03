@@ -1020,11 +1020,14 @@ function PictureRecapCell({ item, index, accent }) {
   const showImage = item.src && !failed;
   return (
     <div style={{
-      height: "100%", display: "flex", flexDirection: "column", gap: 14,
+      display: "flex", flexDirection: "column", gap: 14,
     }}>
-      {/* Photo box */}
+      {/* Photo box — fixed aspect (matches canvas handout cells) so the same
+          objectPosition produces the same visible crop on screen and in the
+          printed handout. */}
       <div style={{
-        flex: 1, position: "relative",
+        aspectRatio: "316 / 220",
+        position: "relative",
         background: `${PALETTE.paper}06`,
         border: `2px solid ${accent.hex}33`,
         borderRadius: 4,
@@ -1126,8 +1129,7 @@ function PictureRoundRecap({ items, tweaks, accent }) {
           <div style={{
             marginTop: 32, display: "grid",
             gridTemplateColumns: "repeat(5, 1fr)",
-            gridTemplateRows: "repeat(2, 1fr)",
-            gap: 24, flex: 1,
+            gap: 24,
           }}>
             {items.map((item, i) => (
               <PictureRecapCell key={i} item={item} index={i} accent={accent} />
