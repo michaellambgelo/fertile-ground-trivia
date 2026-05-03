@@ -7,18 +7,26 @@
 
 import { PICTURE_FILENAME } from './pictures.js';
 
-// Page geometry — keep aspect 16:9 so it matches the deck design and looks
-// sensible whether printed landscape on Letter/A4 or pasted into a doc.
+// Page geometry — mirrors the on-screen PictureRoundRecap slide so the same
+// image crops the same way in both surfaces. Margins, gaps, and cell
+// dimensions match the deck's SPACING + TYPE_SCALE constants.
 const W = 1920;
 const H = 1080;
-const MARGIN_X = 80;
-const TITLE_Y = 80;
+const MARGIN_X = 120;                            // matches slide paddingX
+const TITLE_Y = 100;                             // matches slide paddingTop
 const TITLE_HEIGHT = 96;
-const GRID_TOP = 220;
-const GRID_BOTTOM = H - 80;
-const GAP = 20;
+const RULE_Y = TITLE_Y + TITLE_HEIGHT + 14;      // 210
+const INSTRUCTION_Y = RULE_Y + 32;               // 242
+const GRID_TOP = INSTRUCTION_Y + 80;             // 322
+const GRID_BOTTOM = H - 90;                      // 990 — matches slide paddingBottom
+const GAP = 24;                                  // matches slide grid gap
 const COLS = 5;
 const ROWS = 2;
+// Each cell is split into a photo box (top) and an answer area (bottom),
+// matching the slide's PictureRecapCell flex column.
+const ANSWER_HEIGHT = 56;                        // matches slide answer-line area
+const PHOTO_GAP = 14;                            // matches slide gap between photo and answer
+const ANSWER_LINE_THICKNESS = 2;
 
 // Wait for fonts so the canvas uses Oswald, not the system fallback.
 async function ensureFonts() {
@@ -59,13 +67,23 @@ export async function renderHandoutCanvas(items) {
   // Thin accent rule under the title
   const ruleW = 220;
   ctx.fillStyle = '#0B0E1A';
-  ctx.fillRect((W - ruleW) / 2, TITLE_Y + TITLE_HEIGHT + 8, ruleW, 3);
+  ctx.fillRect((W - ruleW) / 2, RULE_Y, ruleW, 3);
 
-  // Cell geometry
+  // Instruction line — what contestants are doing. Left-aligned to match the
+  // slide layout (italic Inter body text under the accent rule).
+  ctx.fillStyle = '#54514A';
+  ctx.font = `italic 500 36px 'Inter', system-ui, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('Identify the character or creature.', MARGIN_X, INSTRUCTION_Y);
+
+  // Cell geometry — each row is split into a photo box (most of the height)
+  // and an answer area below (writing space with a rule at the bottom).
   const gridW = W - MARGIN_X * 2;
   const gridH = GRID_BOTTOM - GRID_TOP;
   const cellW = (gridW - GAP * (COLS - 1)) / COLS;
-  const cellH = (gridH - GAP * (ROWS - 1)) / ROWS;
+  const rowH = (gridH - GAP * (ROWS - 1)) / ROWS;
+  const photoH = rowH - ANSWER_HEIGHT - PHOTO_GAP;
 
   // Pre-load every image (parallel)
   const images = await Promise.all(items.map((it) => loadImage(it.src)));
@@ -74,30 +92,35 @@ export async function renderHandoutCanvas(items) {
     const r = Math.floor(i / COLS);
     const c = i % COLS;
     const x = MARGIN_X + c * (cellW + GAP);
-    const y = GRID_TOP + r * (cellH + GAP);
+    const y = GRID_TOP + r * (rowH + GAP);
 
-    // Cell background (faint) for empty cells; transparent if image present
+    // Photo box background (faint) for empty cells; transparent if image present
     if (!images[i]) {
       ctx.fillStyle = '#F5F2EA';
-      ctx.fillRect(x, y, cellW, cellH);
+      ctx.fillRect(x, y, cellW, photoH);
     }
 
-    // Cell border
+    // Photo box border
     ctx.strokeStyle = '#0B0E1A';
     ctx.lineWidth = 2;
-    ctx.strokeRect(x + 1, y + 1, cellW - 2, cellH - 2);
+    ctx.strokeRect(x + 1, y + 1, cellW - 2, photoH - 2);
 
-    // Image (object-fit: cover)
+    // Image (object-fit: cover) inside the photo box, with crop position
+    // honored — same math object-position uses in the DOM: position.x/y are
+    // 0-100 and select which slice of the over-sized scaled image lands in
+    // the cell.
     if (images[i]) {
       const img = images[i];
-      const ratio = Math.max(cellW / img.width, cellH / img.height);
+      const ratio = Math.max(cellW / img.width, photoH / img.height);
       const dW = img.width * ratio;
       const dH = img.height * ratio;
-      const dX = x + (cellW - dW) / 2;
-      const dY = y + (cellH - dH) / 2;
+      const px = (items[i].position?.x ?? 50) / 100;
+      const py = (items[i].position?.y ?? 50) / 100;
+      const dX = x + (cellW - dW) * px;
+      const dY = y + (photoH - dH) * py;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(x + 2, y + 2, cellW - 4, cellH - 4);
+      ctx.rect(x + 2, y + 2, cellW - 4, photoH - 4);
       ctx.clip();
       ctx.drawImage(img, dX, dY, dW, dH);
       ctx.restore();
@@ -107,10 +130,10 @@ export async function renderHandoutCanvas(items) {
       ctx.font = `500 28px 'Oswald', sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('PHOTO', x + cellW / 2, y + cellH / 2);
+      ctx.fillText('PHOTO', x + cellW / 2, y + photoH / 2);
     }
 
-    // Number badge (top-left, dark on white for ink-friendly contrast)
+    // Number badge (top-left of the photo box, dark on white for ink-friendly contrast)
     const badgeSize = 56;
     const bx = x + 12;
     const by = y + 12;
@@ -121,6 +144,11 @@ export async function renderHandoutCanvas(items) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(i + 1).padStart(2, '0'), bx + badgeSize / 2, by + badgeSize / 2 + 1);
+
+    // Answer line — sits at the bottom of the answer area; writing goes above it.
+    const lineY = y + photoH + PHOTO_GAP + ANSWER_HEIGHT - ANSWER_LINE_THICKNESS;
+    ctx.fillStyle = '#0B0E1A';
+    ctx.fillRect(x, lineY, cellW, ANSWER_LINE_THICKNESS);
   }
 
   return canvas;

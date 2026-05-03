@@ -20,18 +20,37 @@ export const DEFAULT_PICTURE_ITEMS = Array.from({ length: COUNT }, (_, i) => ({
 export const PICTURE_FILENAME = (i) =>
   `picture-${String(i + 1).padStart(2, '0')}.png`;
 
-// Returns 10 entries: { dataUrl: string|null, caption: string|null }
+// Default crop position: 50/50 = centered (matches `object-position: center`).
+export const DEFAULT_POSITION = { x: 50, y: 50 };
+
+// Normalize a paste entry to the current shape, defaulting any missing fields.
+// Older localStorage entries (pre-crop) won't have `position`.
+function normalizePaste(p) {
+  if (!p || typeof p !== 'object') return { dataUrl: null, caption: null, position: { ...DEFAULT_POSITION } };
+  return {
+    dataUrl: p.dataUrl ?? null,
+    caption: p.caption ?? null,
+    position: {
+      x: p.position?.x ?? 50,
+      y: p.position?.y ?? 50,
+    },
+  };
+}
+
+// Returns 10 entries: { dataUrl, caption, position: {x, y} }
 export function loadPastes() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length === COUNT) return parsed;
+      if (Array.isArray(parsed) && parsed.length === COUNT) {
+        return parsed.map(normalizePaste);
+      }
     }
   } catch {
     // fall through
   }
-  return Array.from({ length: COUNT }, () => ({ dataUrl: null, caption: null }));
+  return Array.from({ length: COUNT }, () => normalizePaste(null));
 }
 
 export function savePastes(pastes) {
@@ -43,13 +62,18 @@ export function clearPastes() {
 }
 
 // Resolve what to actually render: pasted data URL wins over the disk path,
-// pasted caption (rare) wins over the default caption.
+// pasted caption (rare) wins over the default caption, position falls back
+// to centered when nothing has been adjusted.
 export function mergeItems(pastes) {
   return DEFAULT_PICTURE_ITEMS.map((item, i) => {
     const p = pastes[i] || {};
     return {
       src: p.dataUrl || item.src,
       caption: p.caption || item.caption,
+      position: {
+        x: p.position?.x ?? 50,
+        y: p.position?.y ?? 50,
+      },
       isPasted: !!p.dataUrl,
     };
   });

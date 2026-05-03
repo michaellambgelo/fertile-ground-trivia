@@ -35,9 +35,12 @@ The two windows talk to each other live via `BroadcastChannel` (built-in browser
 
 1. In the control window, switch to the **Picture Round** tab.
 2. Click a cell, ⌘V (Mac) / Ctrl+V to paste an image from your clipboard. (Drag-drop a file works too.) Pastes go into `localStorage` so the display picks them up immediately.
-3. **Copy Handout to Clipboard** — copies a print-friendly 1920×1080 PNG (white background, dark borders, "PICTURE ROUND" title, no recap eyebrow). Paste into Word / Pages / email.
-4. **Download Handout PNG** — same image as a file.
-5. **Save Images to Disk** — downloads each pasted image with predictable names (`picture-01.png` … `picture-10.png`). Drop them into `public/images/` so the display can serve them statically and you can clear the localStorage paste buffer.
+3. **Crop / re-frame** — once an image is in a cell, drag it to pan the visible crop. The ↺ button resets the crop to centered.
+4. **Copy Handout to Clipboard** — copies a print-friendly 1920×1080 PNG (white background, dark borders, "PICTURE ROUND" title, no recap eyebrow). Paste into Word / Pages / email.
+5. **Download Handout PNG** — same image as a file.
+6. **Save Images to Disk** — downloads each pasted image with predictable names (`picture-01.png` … `picture-10.png`). Drop them into `public/images/` so the display can serve them statically and you can clear the localStorage paste buffer.
+
+The slide, the canvas handout, and the editor cell all use the same crop-position math (`object-position` percentages), so what you see in the editor is exactly what shows in the recap and on the printed sheet.
 
 ### Display controls (fallback)
 

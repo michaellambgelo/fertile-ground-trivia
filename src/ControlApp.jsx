@@ -352,8 +352,10 @@ function PicturesPanel({ pastes, commitPastes }) {
         const blob = item.getAsFile();
         const reader = new FileReader();
         reader.onload = () => {
+          // Reset crop position when a new image lands so old framing
+          // doesn't carry over to the new picture.
           const next = pastes.map((p, idx) =>
-            idx === i ? { ...p, dataUrl: reader.result } : p
+            idx === i ? { ...p, dataUrl: reader.result, position: { x: 50, y: 50 } } : p
           );
           commitPastes(next);
           setStatusFlash(`Pasted into cell ${String(i + 1).padStart(2, '0')}`);
@@ -371,7 +373,7 @@ function PicturesPanel({ pastes, commitPastes }) {
     const reader = new FileReader();
     reader.onload = () => {
       const next = pastes.map((p, idx) =>
-        idx === i ? { ...p, dataUrl: reader.result } : p
+        idx === i ? { ...p, dataUrl: reader.result, position: { x: 50, y: 50 } } : p
       );
       commitPastes(next);
       setStatusFlash(`Loaded image into cell ${String(i + 1).padStart(2, '0')}`);
@@ -379,9 +381,16 @@ function PicturesPanel({ pastes, commitPastes }) {
     reader.readAsDataURL(file);
   }, [pastes, commitPastes, setStatusFlash]);
 
+  const setCellPosition = useCallback((i, position) => {
+    const next = pastes.map((p, idx) =>
+      idx === i ? { ...p, position } : p
+    );
+    commitPastes(next);
+  }, [pastes, commitPastes]);
+
   const clearCell = (i) => {
     const next = pastes.map((p, idx) =>
-      idx === i ? { dataUrl: null, caption: null } : p
+      idx === i ? { dataUrl: null, caption: null, position: { x: 50, y: 50 } } : p
     );
     commitPastes(next);
   };
@@ -426,6 +435,7 @@ function PicturesPanel({ pastes, commitPastes }) {
       <Card title="Picture Round — paste images, then export">
         <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 14 }}>
           Click a cell to focus it, then ⌘V (Mac) / Ctrl+V to paste an image. Or drag-drop a file.
+          Once an image is in a cell, <strong>drag the image</strong> to crop / re-frame it; the ↺ button resets the crop.
           Pastes live in <code>localStorage</code>; click <strong>Save Images to Disk</strong> when done
           to download them as <code>{PICTURE_FILENAME(0)}</code> … and drop them into <code>public/images/</code>.
         </div>
@@ -440,11 +450,13 @@ function PicturesPanel({ pastes, commitPastes }) {
               dataUrl={p.dataUrl}
               fallbackSrc={items[i].src}
               isPasted={items[i].isPasted}
+              position={items[i].position}
               focused={focusedCell === i}
               onFocus={() => setFocusedCell(i)}
               onPaste={(e) => handlePaste(i, e)}
               onDrop={(e) => handleDrop(i, e)}
               onClear={() => clearCell(i)}
+              onPositionChange={(pos) => setCellPosition(i, pos)}
             />
           ))}
         </div>
@@ -464,10 +476,46 @@ function PicturesPanel({ pastes, commitPastes }) {
   );
 }
 
-function PictureCell({ i, dataUrl, fallbackSrc, isPasted, focused, onFocus, onPaste, onDrop, onClear }) {
+function PictureCell({
+  i, dataUrl, fallbackSrc, isPasted, position, focused,
+  onFocus, onPaste, onDrop, onClear, onPositionChange,
+}) {
   const ref = useRef(null);
   const [diskFailed, setDiskFailed] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const showSrc = dataUrl || (!diskFailed ? fallbackSrc : null);
+  const isPositioned = (position?.x ?? 50) !== 50 || (position?.y ?? 50) !== 50;
+
+  // Drag-to-pan: when an image is loaded, holding pointer down and dragging
+  // shifts the visible crop. We translate pixel deltas into objectPosition
+  // percentage deltas, inverted (drag right = show more of the right edge).
+  const onPointerDown = (e) => {
+    if (!showSrc) return;          // empty cell: leave click→focus behavior alone
+    if (e.button !== 0) return;    // left click only
+    e.preventDefault();
+    const rect = ref.current.getBoundingClientRect();
+    const startX = e.clientX, startY = e.clientY;
+    const startPos = { x: position?.x ?? 50, y: position?.y ?? 50 };
+    let moved = false;
+    const onMove = (e2) => {
+      const dx = e2.clientX - startX;
+      const dy = e2.clientY - startY;
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return;  // ignore tiny jitters
+      moved = true;
+      setDragging(true);
+      const nx = clamp(startPos.x - (dx / rect.width) * 100, 0, 100);
+      const ny = clamp(startPos.y - (dy / rect.height) * 100, 0, 100);
+      onPositionChange({ x: nx, y: ny });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      setDragging(false);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
   return (
     <div
       ref={ref}
@@ -477,19 +525,26 @@ function PictureCell({ i, dataUrl, fallbackSrc, isPasted, focused, onFocus, onPa
       onPaste={onPaste}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
+      onPointerDown={onPointerDown}
       style={{
         position: 'relative', aspectRatio: '1 / 1', borderRadius: 6,
         border: `2px solid ${focused ? COLORS.accent : COLORS.border}`,
-        background: COLORS.bg, overflow: 'hidden', cursor: 'pointer',
-        outline: 'none',
+        background: COLORS.bg, overflow: 'hidden',
+        cursor: showSrc ? (dragging ? 'grabbing' : 'grab') : 'pointer',
+        outline: 'none', userSelect: 'none', touchAction: 'none',
       }}
     >
       {showSrc ? (
         <img
           src={showSrc}
           alt={`Picture ${i + 1}`}
+          draggable={false}
           onError={() => { if (!isPasted) setDiskFailed(true); }}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{
+            width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+            objectPosition: `${position?.x ?? 50}% ${position?.y ?? 50}%`,
+            pointerEvents: 'none',  // pointer events go to the cell so drag works
+          }}
         />
       ) : (
         <div style={{
@@ -505,13 +560,31 @@ function PictureCell({ i, dataUrl, fallbackSrc, isPasted, focused, onFocus, onPa
         width: 28, height: 28, display: 'flex', alignItems: 'center',
         justifyContent: 'center', fontSize: 12, fontWeight: 700,
         background: COLORS.accent, color: COLORS.bg, borderRadius: 4,
-        fontFamily: 'Oswald, sans-serif',
+        fontFamily: 'Oswald, sans-serif', pointerEvents: 'none',
       }}>
         {String(i + 1).padStart(2, '0')}
       </div>
+      {showSrc && isPositioned && (
+        <button
+          type="button"
+          title="Reset crop"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPositionChange({ x: 50, y: 50 });
+          }}
+          style={{
+            position: 'absolute', top: 6, right: 34, width: 22, height: 22,
+            border: 0, borderRadius: 4, background: COLORS.panelAlt, color: COLORS.text,
+            fontSize: 12, lineHeight: '20px', cursor: 'pointer',
+          }}
+        >↺</button>
+      )}
       {dataUrl && (
         <button
           type="button"
+          title="Clear cell"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onClear(); }}
           style={{
             position: 'absolute', top: 6, right: 6, width: 22, height: 22,
@@ -524,13 +597,17 @@ function PictureCell({ i, dataUrl, fallbackSrc, isPasted, focused, onFocus, onPa
         <div style={{
           position: 'absolute', bottom: 4, right: 6, fontSize: 9,
           letterSpacing: '0.18em', textTransform: 'uppercase', color: COLORS.warn,
-          textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+          textShadow: '0 1px 2px rgba(0,0,0,0.6)', pointerEvents: 'none',
         }}>
           Pasted
         </div>
       )}
     </div>
   );
+}
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
 }
 
 // ============================================================

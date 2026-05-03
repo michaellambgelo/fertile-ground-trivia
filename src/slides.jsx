@@ -1020,56 +1020,69 @@ function PictureRecapCell({ item, index, accent }) {
   const showImage = item.src && !failed;
   return (
     <div style={{
-      position: "relative",
-      background: `${PALETTE.paper}06`,
-      border: `2px solid ${accent.hex}33`,
-      borderRadius: 4,
-      overflow: "hidden",
+      height: "100%", display: "flex", flexDirection: "column", gap: 14,
     }}>
-      {showImage ? (
-        <img
-          src={item.src}
-          alt={item.caption || `Picture ${index + 1}`}
-          onError={() => setFailed(true)}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-        />
-      ) : (
-        <div style={{
-          position: "absolute", inset: 8,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          border: `2px dashed ${PALETTE.paper}22`,
-          borderRadius: 2,
-        }}>
-          <div style={{
-            fontFamily: displayFont, fontSize: TYPE_SCALE.meta, fontWeight: 500,
-            color: PALETTE.paperDim, letterSpacing: "0.36em", opacity: 0.55,
-          }}>
-            PHOTO
-          </div>
-        </div>
-      )}
+      {/* Photo box */}
       <div style={{
-        position: "absolute", top: 12, left: 12,
-        width: 56, height: 56,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontFamily: displayFont, fontWeight: 700, fontSize: 30,
-        color: PALETTE.ink, background: accent.hex,
-        boxShadow: `0 0 18px ${accent.glow}`,
-        borderRadius: 4, letterSpacing: "0.02em",
+        flex: 1, position: "relative",
+        background: `${PALETTE.paper}06`,
+        border: `2px solid ${accent.hex}33`,
+        borderRadius: 4,
+        overflow: "hidden",
       }}>
-        {String(index + 1).padStart(2, "0")}
-      </div>
-      {item.caption && (
+        {showImage ? (
+          <img
+            src={item.src}
+            alt={item.caption || `Picture ${index + 1}`}
+            onError={() => setFailed(true)}
+            style={{
+              width: "100%", height: "100%", objectFit: "cover", display: "block",
+              objectPosition: `${item.position?.x ?? 50}% ${item.position?.y ?? 50}%`,
+            }}
+          />
+        ) : (
+          <div style={{
+            position: "absolute", inset: 8,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: `2px dashed ${PALETTE.paper}22`,
+            borderRadius: 2,
+          }}>
+            <div style={{
+              fontFamily: displayFont, fontSize: TYPE_SCALE.meta, fontWeight: 500,
+              color: PALETTE.paperDim, letterSpacing: "0.36em", opacity: 0.55,
+            }}>
+              PHOTO
+            </div>
+          </div>
+        )}
         <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0,
-          padding: "10px 14px",
-          background: `linear-gradient(180deg, transparent, ${PALETTE.ink}cc)`,
-          fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 500,
-          color: PALETTE.paper, letterSpacing: "0.02em",
+          position: "absolute", top: 12, left: 12,
+          width: 56, height: 56,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: displayFont, fontWeight: 700, fontSize: 30,
+          color: PALETTE.ink, background: accent.hex,
+          boxShadow: `0 0 18px ${accent.glow}`,
+          borderRadius: 4, letterSpacing: "0.02em",
         }}>
-          {item.caption}
+          {String(index + 1).padStart(2, "0")}
         </div>
-      )}
+        {item.caption && (
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0,
+            padding: "10px 14px",
+            background: `linear-gradient(180deg, transparent, ${PALETTE.ink}cc)`,
+            fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 500,
+            color: PALETTE.paper, letterSpacing: "0.02em",
+          }}>
+            {item.caption}
+          </div>
+        )}
+      </div>
+      {/* Answer line — empty writing space with a rule at the bottom (writing
+          goes above the line on the printed handout). */}
+      <div style={{
+        height: 56, borderBottom: `2px solid ${PALETTE.paper}55`,
+      }} />
     </div>
   );
 }
@@ -1104,7 +1117,14 @@ function PictureRoundRecap({ items, tweaks, accent }) {
           }} />
 
           <div style={{
-            marginTop: 56, display: "grid",
+            marginTop: 24, fontFamily: "'Inter', sans-serif", fontStyle: "italic",
+            fontSize: TYPE_SCALE.body, color: PALETTE.paperDim, maxWidth: 1200,
+          }}>
+            Identify the character or creature.
+          </div>
+
+          <div style={{
+            marginTop: 32, display: "grid",
             gridTemplateColumns: "repeat(5, 1fr)",
             gridTemplateRows: "repeat(2, 1fr)",
             gap: 24, flex: 1,
