@@ -91,3 +91,69 @@ export function saveTiebreakers(tiebreakers) {
 export function resetTiebreakers() {
   localStorage.removeItem(TIEBREAKER_STORAGE_KEY);
 }
+
+// Recap slide chunking — most rounds split into 5+5, round 5's longer prompts
+// split into 3+3+4 so each slide stays readable. Returns [[start, end], ...]
+// half-open ranges into the round's questions array.
+export function recapSplitsFor(round) {
+  if (round.n === 5) return [[0, 3], [3, 6], [6, 10]];
+  return [[0, 5], [5, 10]];
+}
+
+// ---- Export / import ------------------------------------------------------
+// Round content + tiebreakers serialize to a single JSON file so a host can
+// back up before clicking Reset, restore after a wipe, or move questions
+// between machines. Pictures intentionally not included — they're handled
+// by the Save Images to Disk flow on the Picture Round panel.
+
+export const QUESTIONS_EXPORT_TYPE = 'star-wars-trivia/questions';
+export const QUESTIONS_EXPORT_VERSION = 1;
+
+export function buildQuestionsExport(rounds, tiebreakers) {
+  return {
+    type: QUESTIONS_EXPORT_TYPE,
+    version: QUESTIONS_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    rounds: clone(rounds),
+    tiebreakers: [...tiebreakers],
+  };
+}
+
+export function parseQuestionsImport(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('File is not valid JSON.');
+  }
+  if (!data || typeof data !== 'object') {
+    throw new Error('Expected a JSON object at the top level.');
+  }
+  if (data.type !== QUESTIONS_EXPORT_TYPE) {
+    throw new Error('Not a Star Wars Trivia questions export (wrong "type").');
+  }
+  if (!Array.isArray(data.rounds) || data.rounds.length === 0) {
+    throw new Error('"rounds" must be a non-empty array.');
+  }
+  data.rounds.forEach((r, i) => {
+    const where = `Round ${i + 1}`;
+    if (!r || typeof r !== 'object') throw new Error(`${where}: not an object.`);
+    if (typeof r.n !== 'number') throw new Error(`${where}: missing numeric "n".`);
+    if (typeof r.title !== 'string') throw new Error(`${where}: missing "title".`);
+    if (typeof r.subtitle !== 'string') throw new Error(`${where}: missing "subtitle".`);
+    if (typeof r.kicker !== 'string') throw new Error(`${where}: missing "kicker".`);
+    if (!Array.isArray(r.questions) || !r.questions.every((q) => typeof q === 'string')) {
+      throw new Error(`${where}: "questions" must be an array of strings.`);
+    }
+  });
+  if (!Array.isArray(data.tiebreakers) || !data.tiebreakers.every((t) => typeof t === 'string')) {
+    throw new Error('"tiebreakers" must be an array of strings.');
+  }
+  if (data.tiebreakers.length !== TIEBREAKER_COUNT) {
+    throw new Error(`"tiebreakers" must contain exactly ${TIEBREAKER_COUNT} entries.`);
+  }
+  return {
+    rounds: data.rounds.map((r) => ({ ...r, questions: [...r.questions] })),
+    tiebreakers: [...data.tiebreakers],
+  };
+}

@@ -78,7 +78,10 @@ export async function renderHandoutCanvas(items) {
   ctx.font = `italic 500 36px 'Inter', system-ui, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText('Identify the character or creature.', MARGIN_X, INSTRUCTION_Y);
+  ctx.fillText('Identify the character, place, ship or creature.', MARGIN_X, INSTRUCTION_Y);
+
+  // TEAM field — right side of the instruction row.
+  drawTeamField(ctx, W - MARGIN_X - 480, INSTRUCTION_Y, 480);
 
   // Cell geometry — derive everything from the cell width (set by COLS+GAP)
   // and the fixed photo-box aspect, so the printed handout's cells match the
@@ -177,6 +180,94 @@ export async function downloadHandoutPng(items, filename = 'picture-round-handou
   const blob = await canvasToBlob(canvas);
   if (!blob) throw new Error('Failed to create handout blob');
   triggerDownload(blob, filename);
+}
+
+// Generic "10 answer lines + team / round field" worksheet for non-picture
+// rounds. One PNG, photocopy as many as needed.
+export async function renderAnswersHandoutCanvas() {
+  await ensureFonts();
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // White background — print-friendly, ink-friendly.
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, W, H);
+
+  // Title — match the picture handout's typography.
+  ctx.fillStyle = '#0B0E1A';
+  ctx.font = `700 88px 'Oswald', 'Bebas Neue', Impact, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('ANSWERS', W / 2, TITLE_Y);
+
+  // Thin accent rule under the title (mirrors the picture handout).
+  const ruleW = 220;
+  ctx.fillRect((W - ruleW) / 2, RULE_Y, ruleW, 3);
+
+  // TEAM (left) + ROUND (right) on the same row as the instruction line.
+  const fieldsY = INSTRUCTION_Y;
+  ctx.font = `700 32px 'Oswald', 'Bebas Neue', Impact, sans-serif`;
+  const roundLabelW = ctx.measureText('ROUND:').width;
+  const roundLineW = 160;
+  const roundBlockW = roundLabelW + 14 + roundLineW;
+  drawTeamField(ctx, MARGIN_X, fieldsY, (W - 2 * MARGIN_X) - roundBlockW - 80);
+  drawLabeledLine(ctx, 'ROUND:', W - MARGIN_X - roundBlockW, fieldsY, roundLineW);
+
+  // 10 numbered answer lines, evenly spaced down the page.
+  const LINES_TOP = 332;
+  const LINE_GAP = 70;
+  ctx.font = `700 36px 'Oswald', 'Bebas Neue', Impact, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  for (let i = 0; i < 10; i++) {
+    const lineY = LINES_TOP + i * LINE_GAP;
+    const numLabel = `${String(i + 1).padStart(2, '0')}.`;
+    ctx.fillStyle = '#0B0E1A';
+    ctx.fillText(numLabel, MARGIN_X, lineY);
+    const numW = ctx.measureText(numLabel).width;
+    const writeStart = MARGIN_X + numW + 24;
+    const writeEnd = W - MARGIN_X;
+    const writeY = lineY + 44;
+    ctx.fillRect(writeStart, writeY, writeEnd - writeStart, ANSWER_LINE_THICKNESS);
+  }
+
+  return canvas;
+}
+
+export async function downloadAnswersHandoutPng(filename = 'answers-handout.png') {
+  const canvas = await renderAnswersHandoutCanvas();
+  const blob = await canvasToBlob(canvas);
+  if (!blob) throw new Error('Failed to create handout blob');
+  triggerDownload(blob, filename);
+}
+
+// Render "TEAM:" + an underline running from the end of the label to a fixed
+// total width. Used by both the picture handout and the answers handout so
+// the field looks identical on both surfaces.
+function drawTeamField(ctx, x, y, totalWidth) {
+  drawLabeledLine(ctx, 'TEAM:', x, y, totalWidth - measureLabel(ctx, 'TEAM:') - 14);
+}
+
+function drawLabeledLine(ctx, label, x, y, lineWidth) {
+  ctx.fillStyle = '#0B0E1A';
+  ctx.font = `700 32px 'Oswald', 'Bebas Neue', Impact, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(label, x, y + 4);
+  const labelW = ctx.measureText(label).width;
+  const lineX = x + labelW + 14;
+  const lineY = y + 40;
+  ctx.fillRect(lineX, lineY, lineWidth, 2);
+}
+
+function measureLabel(ctx, label) {
+  const prevFont = ctx.font;
+  ctx.font = `700 32px 'Oswald', 'Bebas Neue', Impact, sans-serif`;
+  const w = ctx.measureText(label).width;
+  ctx.font = prevFont;
+  return w;
 }
 
 // Download each pasted image individually with the predictable picture-NN.png

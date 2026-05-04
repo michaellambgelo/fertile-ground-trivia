@@ -9,8 +9,8 @@ const TYPE_SCALE = {
   title: 88,      // section / round titles
   subtitle: 56,   // q-numbers, secondary headers
   body: 36,       // question prompts
-  meta: 28,       // labels, eyebrows
-  small: 24,      // captions, footers
+  meta: 34,       // labels, eyebrows
+  small: 30,      // captions, footers
 };
 
 const SPACING = {
@@ -618,7 +618,7 @@ function PictureRoundInstructions({ tweaks, accent }) {
         <CornerMarks accentHex={accent.hex} />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px 130px`,
           height: "100%", display: "flex", flexDirection: "column",
         }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 32 }}>
@@ -695,8 +695,6 @@ function PictureRoundInstructions({ tweaks, accent }) {
             </div>
           </div>
         </div>
-
-        <FooterBar left="Round 01" right="Picture Round" accentHex={accent.hex} />
       </div>
     </section>
   );
@@ -865,7 +863,7 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, ki
         </div>
 
         <FooterBar
-          left={isTiebreaker ? "Sudden Death" : `Round ${String(round).padStart(2, "0")}`}
+          left={isTiebreaker ? "Final Wager" : `Round ${String(round).padStart(2, "0")}`}
           right={isTiebreaker
             ? `Tiebreaker ${String(q).padStart(2, "0")} / ${String(total).padStart(2, "0")}`
             : `Question ${String(q).padStart(2, "0")} / ${String(total).padStart(2, "0")}`}
@@ -881,10 +879,9 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, ki
 // One round produces two of these slides (questions 1–5, then 6–10) so
 // each prompt can wrap fully without being truncated.
 // ============================================================
-function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex = 0, totalQuestions = 10 }) {
+function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex = 0, totalQuestions = 10, part = "A" }) {
   const start = startIndex + 1;
   const end = startIndex + questions.length;
-  const part = startIndex === 0 ? "A" : "B";
   const showFooterHint = end >= totalQuestions; // only on the last recap of the round
   return (
     <section data-label={`R${round} Recap ${part}`}>
@@ -937,7 +934,7 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex =
                   {String(startIndex + i + 1).padStart(2, "0")}
                 </div>
                 <div style={{
-                  fontFamily: "'Inter', sans-serif", fontSize: 22, lineHeight: 1.28,
+                  fontFamily: "'Inter', sans-serif", fontSize: 32, lineHeight: 1.28,
                   color: PALETTE.paper, fontWeight: 400,
                   flex: 1, minWidth: 0, maxWidth: 1600,
                 }}>
@@ -1083,7 +1080,7 @@ function PictureRecapCell({ item, index, accent }) {
           position: "absolute", bottom: 0, left: 0, right: 0,
           padding: "10px 14px",
           background: `linear-gradient(180deg, transparent, ${PALETTE.ink}cc)`,
-          fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 500,
+          fontFamily: "'Inter', sans-serif", fontSize: 28, fontWeight: 500,
           color: PALETTE.paper, letterSpacing: "0.02em",
         }}>
           {item.caption}
@@ -1151,17 +1148,17 @@ function PictureRoundRecap({ items, tweaks, accent }) {
 }
 
 // ============================================================
-// SLIDE: TIEBREAKER INTRO — sudden-death rules
+// SLIDE: TIEBREAKER INTRO — Final Wager rules (Final Jeopardy style)
 // ============================================================
 function TiebreakerIntroSlide({ tweaks, accent }) {
   const rules = [
-    { n: "I",   t: "Pick a Team",            d: "A team is selected at random — or by rock-paper-scissors — to receive the question first." },
-    { n: "II",  t: "First Correct Wins",     d: "If that team answers correctly, they win the night. Game over." },
-    { n: "III", t: "Pass on a Miss",         d: "If they're wrong, the next team gets a shot at the same question." },
-    { n: "IV",  t: "Next Question if Stumped", d: "If no team can answer, we move to the next tiebreaker — and keep going until someone wins." },
+    { n: "I",   t: "Place Your Wager",       d: "Each tied team secretly writes a wager from 0 up to their total score before the question is read." },
+    { n: "II",  t: "One Question, One Answer", d: "Hosts read the prompt. Each team writes one answer on their sheet. No conferring." },
+    { n: "III", t: "Reveal & Adjust",         d: "Correct answers add the wager to your score. Wrong answers subtract it. Highest total wins." },
+    { n: "IV",  t: "Up to Three Tries",       d: "Still tied after wagers are settled? We play again with a new question — up to a maximum of three." },
   ];
   return (
-    <section data-label="Tiebreakers · Sudden Death">
+    <section data-label="Tiebreakers · Final Wager">
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
@@ -1170,7 +1167,7 @@ function TiebreakerIntroSlide({ tweaks, accent }) {
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
           height: "100%", display: "flex", flexDirection: "column",
         }}>
-          <Eyebrow accentHex={accent.hex}>Round 05 · Sudden Death</Eyebrow>
+          <Eyebrow accentHex={accent.hex}>Round 05 · Final Wager</Eyebrow>
           <div style={{
             fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
             letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
@@ -1215,7 +1212,7 @@ function TiebreakerIntroSlide({ tweaks, accent }) {
           </div>
         </div>
 
-        <FooterBar left="Sudden Death" right="First Correct Answer Wins" accentHex={accent.hex} />
+        <FooterBar left="Final Wager" accentHex={accent.hex} />
       </div>
     </section>
   );

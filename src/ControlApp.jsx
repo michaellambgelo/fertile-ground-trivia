@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS,
   loadTiebreakers, saveTiebreakers, resetTiebreakers, DEFAULT_TIEBREAKERS,
+  buildQuestionsExport, parseQuestionsImport, recapSplitsFor,
 } from './rounds.js';
 import { loadPastes, savePastes, clearPastes, mergeItems, PICTURE_FILENAME } from './pictures.js';
-import { copyHandoutToClipboard, downloadHandoutPng, downloadAllImages } from './handout.js';
+import {
+  copyHandoutToClipboard, downloadHandoutPng, downloadAllImages, downloadAnswersHandoutPng,
+} from './handout.js';
 import { broadcast, useBroadcast } from './broadcast.js';
 
 // ============================================================
@@ -281,6 +284,7 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
   const [draft, setDraft] = useState(rounds);
   const [draftTiebreakers, setDraftTiebreakers] = useState(tiebreakers);
   const [dirty, setDirty] = useState(false);
+  const fileInputRef = useRef(null);
 
   // If the persisted data changes externally (e.g. another window saved), pull
   // it in — but only when not editing, to avoid clobbering in-flight edits.
@@ -330,6 +334,55 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
     commitTiebreakers(freshTiebreakers);
   };
 
+  const onExport = () => {
+    const payload = buildQuestionsExport(draft, draftTiebreakers);
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().slice(0, 10);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `star-wars-trivia-questions-${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const onImportClick = () => fileInputRef.current?.click();
+
+  const onImportFile = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const { rounds: nextRounds, tiebreakers: nextTb } = parseQuestionsImport(reader.result);
+        setDraft(nextRounds);
+        setDraftTiebreakers(nextTb);
+        setDirty(true);
+      } catch (err) {
+        alert(`Import failed: ${err.message}`);
+      }
+    };
+    reader.onerror = () => alert('Could not read file.');
+    reader.readAsText(file);
+  };
+
+  // Cmd/Ctrl+S → Save & Push (only when there are unsaved edits).
+  const trySaveRef = useRef(() => {});
+  trySaveRef.current = () => { if (dirty) save(); };
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      if (e.key !== 's' && e.key !== 'S') return;
+      e.preventDefault();
+      trySaveRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{
@@ -339,6 +392,16 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
         <Button onClick={save} primary disabled={!dirty}>Save & Push to Display</Button>
         <Button onClick={revert} disabled={!dirty}>Revert</Button>
         <Button onClick={reset} secondary>Reset to Defaults</Button>
+        <span style={{ width: 1, height: 24, background: COLORS.border, margin: '0 4px' }} />
+        <Button onClick={onExport}>Export</Button>
+        <Button onClick={onImportClick}>Import…</Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={onImportFile}
+          style={{ display: 'none' }}
+        />
         {dirty && <span style={{ color: COLORS.warn, fontSize: 12 }}>Unsaved changes</span>}
       </div>
       {draft.map((r, ri) => (
@@ -362,9 +425,9 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
           ))}
         </Card>
       ))}
-      <Card title="Tiebreakers — Sudden Death">
+      <Card title="Tiebreakers — Final Wager">
         <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 8 }}>
-          Used after the final round if there's a tie. Same prompt format as round questions.
+          Used after the final round if teams are tied. Tied teams wager from their score, then write an answer — Final Jeopardy style. Up to three questions.
         </div>
         {draftTiebreakers.map((t, i) => (
           <Field
@@ -480,6 +543,29 @@ function PicturesPanel({ pastes, commitPastes }) {
     }
   };
 
+  const onDownloadAnswers = async () => {
+    try {
+      await downloadAnswersHandoutPng();
+      setStatusFlash('Answers handout downloaded — photocopy one per team per round');
+    } catch (e) {
+      setStatusFlash(`Download failed: ${e.message}`);
+    }
+  };
+
+  // Cmd/Ctrl+S → Save Images to Disk (the labeled "Save" action on this tab).
+  const onSaveImagesRef = useRef(onSaveImages);
+  onSaveImagesRef.current = onSaveImages;
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      if (e.key !== 's' && e.key !== 'S') return;
+      e.preventDefault();
+      onSaveImagesRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Card title="Picture Round — paste images, then export">
@@ -514,6 +600,7 @@ function PicturesPanel({ pastes, commitPastes }) {
           <Button onClick={onCopy} primary>Copy Handout to Clipboard</Button>
           <Button onClick={onDownload}>Download Handout PNG</Button>
           <Button onClick={onSaveImages}>Save Images to Disk</Button>
+          <Button onClick={onDownloadAnswers}>Download Answers Handout</Button>
           <Button onClick={clearAll} secondary>Clear All</Button>
           {status && (
             <span style={{ marginLeft: 8, fontSize: 12, color: COLORS.accent }}>
@@ -746,8 +833,14 @@ function buildSlideOutline(rounds, tiebreakers = []) {
         detail: prompt,
       });
     });
-    list.push({ key: `r${r.n}-recap-a`, label: `Round ${r.n} Recap A — Q01–05` });
-    list.push({ key: `r${r.n}-recap-b`, label: `Round ${r.n} Recap B — Q06–10` });
+    recapSplitsFor(r).forEach(([start, end], i) => {
+      const part = String.fromCharCode(65 + i);
+      const range = `Q${String(start + 1).padStart(2, '0')}–${String(end).padStart(2, '0')}`;
+      list.push({
+        key: `r${r.n}-recap-${String.fromCharCode(97 + i)}`,
+        label: `Round ${r.n} Recap ${part} — ${range}`,
+      });
+    });
     if (idx < rounds.length - 1) {
       const next = rounds[idx + 1];
       list.push({ key: `int-${next.n}`, label: `Intermission · Before Round ${next.n}` });
@@ -755,7 +848,7 @@ function buildSlideOutline(rounds, tiebreakers = []) {
   });
   list.push({ key: 'end', label: 'End — May the Force Be With You' });
   // Tiebreakers live past the End slide and are only reached if needed.
-  list.push({ key: 'tb-intro', label: 'Tiebreakers — Sudden Death (only if tied)' });
+  list.push({ key: 'tb-intro', label: 'Tiebreakers — Final Wager (only if tied)' });
   tiebreakers.forEach((prompt, i) => {
     list.push({
       key: `tb-q${i + 1}`,

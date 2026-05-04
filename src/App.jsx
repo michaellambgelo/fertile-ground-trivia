@@ -8,7 +8,7 @@ import {
   RoundOpener, PictureRoundInstructions, IntermissionSlide, QuestionSlide,
   RoundRecap, PictureRoundRecap, TiebreakerIntroSlide, EndSlide,
 } from './slides.jsx';
-import { loadRounds, loadTiebreakers } from './rounds.js';
+import { loadRounds, loadTiebreakers, recapSplitsFor } from './rounds.js';
 import { loadPastes, mergeItems } from './pictures.js';
 import { broadcast, useBroadcast } from './broadcast.js';
 
@@ -146,31 +146,24 @@ function App() {
       );
     });
 
-    // Two recap slides per round, 5 questions each, so prompts can wrap fully.
-    slides.push(
-      <RoundRecap
-        key={`r${r.n}-recap-a`}
-        round={r.n}
-        roundTitle={r.title}
-        questions={r.questions.slice(0, 5)}
-        startIndex={0}
-        totalQuestions={r.questions.length}
-        tweaks={tweaks}
-        accent={accent}
-      />
-    );
-    slides.push(
-      <RoundRecap
-        key={`r${r.n}-recap-b`}
-        round={r.n}
-        roundTitle={r.title}
-        questions={r.questions.slice(5, 10)}
-        startIndex={5}
-        totalQuestions={r.questions.length}
-        tweaks={tweaks}
-        accent={accent}
-      />
-    );
+    // Recap slides per round. Most rounds split 5+5; round 5's prompts run
+    // long enough that 5-per-slide gets cramped, so it splits 3+3+4.
+    const recapSplits = recapSplitsFor(r);
+    recapSplits.forEach(([start, end], i) => {
+      slides.push(
+        <RoundRecap
+          key={`r${r.n}-recap-${String.fromCharCode(97 + i)}`}
+          round={r.n}
+          roundTitle={r.title}
+          questions={r.questions.slice(start, end)}
+          startIndex={start}
+          totalQuestions={r.questions.length}
+          part={String.fromCharCode(65 + i)}
+          tweaks={tweaks}
+          accent={accent}
+        />
+      );
+    });
 
     // Intermission after rounds 2, 3, 4 (not after final round)
     if (idx < rounds.length - 1) {
@@ -192,8 +185,8 @@ function App() {
   // reached by hitting Next when there's an actual tie at the end of play.
   slides.push(<EndSlide key="end" tweaks={tweaks} accent={accent} />);
 
-  // Tiebreakers — sudden-death after the End slide. Skip past these unless
-  // teams are tied; advance into them only when needed.
+  // Tiebreakers — Final Wager (Final Jeopardy style) after the End slide.
+  // Skip past these unless teams are tied; advance into them only when needed.
   slides.push(<TiebreakerIntroSlide key="tb-intro" tweaks={tweaks} accent={accent} />);
   tiebreakers.forEach((prompt, i) => {
     slides.push(
@@ -204,7 +197,7 @@ function App() {
         q={i + 1}
         total={tiebreakers.length}
         prompt={prompt}
-        roundTitle="Sudden Death"
+        roundTitle="Final Wager"
         tweaks={tweaks}
         accent={accent}
       />
