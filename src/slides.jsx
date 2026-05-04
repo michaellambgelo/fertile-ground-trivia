@@ -323,7 +323,7 @@ function TitleSlide({ tweaks, accent }) {
 function RulesSlide({ tweaks, accent }) {
   const rules = [
     { n: "I",   t: "No phones",       d: "Looking up answers will result in points being deducted at the hosts' discretion." },
-    { n: "II",  t: "Spelling is forgiving",  d: "Misspellings are fine as long as the answer is unambiguous and correct." },
+    { n: "II",  t: "Spelling is best attempt",  d: "Misspellings are fine as long as the answer is unambiguous and correct." },
     { n: "III", t: "Hosts are final",   d: "Jack and Michael have the last word on every ruling. No appeals to the High Council." },
     { n: "IV",  t: "Have fun",         d: "It's a long time ago in a galaxy far, far away... You're allowed to be cheesy." },
   ];
@@ -691,7 +691,7 @@ function PictureRoundInstructions({ tweaks, accent }) {
               fontFamily: "'Inter', sans-serif", fontSize: TYPE_SCALE.small,
               color: PALETTE.paper,
             }}>
-              No phones. Spelling is forgiving — just make sure we can tell who you mean.
+              No phones. Spelling is best attempt — just make sure we can tell who you mean.
             </div>
           </div>
         </div>
