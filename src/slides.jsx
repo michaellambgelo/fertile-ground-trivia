@@ -722,13 +722,17 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, ki
     return () => document.removeEventListener('slidechange', handler);
   }, []);
 
-  // Reset to full duration (and unpause) when this slide becomes active or
-  // timer settings change.
+  // Reset state AND broadcast the fresh value in one effect on activation.
+  // The broadcast must use `fresh` directly rather than reading `seconds` from
+  // a separate effect — `seconds` may still hold a stale value from this
+  // slide's previous mount until the next render lands, which would briefly
+  // leak that stale value to the control window.
   useEffect(() => {
-    if (isActive) {
-      setSeconds(tweaks.timerSeconds || 30);
-      setPaused(false);
-    }
+    if (!isActive) return;
+    const fresh = tweaks.timerSeconds || 30;
+    setSeconds(fresh);
+    setPaused(false);
+    broadcast('timer:state', { enabled: !!tweaks.showTimer, seconds: fresh, paused: false });
   }, [isActive, tweaks.timerSeconds, tweaks.showTimer]);
 
   // Tick down once per second while active, enabled, not paused, and > 0.
@@ -752,11 +756,15 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, ki
     }
   }, [isActive, tweaks.timerSeconds, tweaks.showTimer, seconds, paused]));
 
-  // Push timer state to the control window whenever it changes.
+  // Push tick / pause changes to the control window. isActive deliberately
+  // omitted from deps — the activation broadcast lives in the reset effect
+  // above (which sends the fresh value); duplicating it here would re-broadcast
+  // stale `seconds` and reintroduce the flicker.
   useEffect(() => {
     if (!isActive) return;
     broadcast('timer:state', { enabled: !!tweaks.showTimer, seconds, paused });
-  }, [isActive, seconds, paused, tweaks.showTimer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seconds, paused, tweaks.showTimer]);
 
   const dataLabel = isTiebreaker
     ? `TIEBREAKER ${String(q).padStart(2, "0")}`
