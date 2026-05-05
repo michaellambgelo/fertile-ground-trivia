@@ -20,7 +20,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "showStars": true,
   "showQNumbers": true,
   "showTimer": true,
-  "timerSeconds": 120
+  "timerSeconds": 90
 }/*EDITMODE-END*/;
 
 // ============================================================
@@ -99,21 +99,22 @@ function App() {
   // 6. Round 1 instructions
   slides.push(<PictureRoundInstructions key="r1-instr" tweaks={tweaks} accent={accent} />);
 
-  // 7. Picture Round Recap — discussed right after the picture round, before R2
+  // 7. Intermission — collect picture-round answer sheets BEFORE the recap
+  // reveals them. Teases R2 (the next round after the picture-round recap).
+  slides.push(
+    <IntermissionSlide key="int-r1" label="Intermission · Round 01"
+      nextRound={2} nextTitle="Original Trilogy"
+      tweaks={tweaks} accent={accent}
+    />
+  );
+
+  // 8. Picture Round Recap — answers revealed after sheets are collected
   slides.push(
     <PictureRoundRecap
       key="r1-recap"
       items={pictureItems}
       tweaks={tweaks}
       accent={accent}
-    />
-  );
-
-  // 8. Intermission to Round 2
-  slides.push(
-    <IntermissionSlide key="int-r2" label="08 Intermission · Before R2"
-      nextRound={2} nextTitle="Original Trilogy"
-      tweaks={tweaks} accent={accent}
     />
   );
 
@@ -146,6 +147,22 @@ function App() {
       );
     });
 
+    // Intermission BEFORE recap so teams hand in sheets before answers are
+    // revealed. R2-R4 tease the next round; R5 has no next round, so it teases
+    // the final tally instead.
+    const next = rounds[idx + 1];
+    slides.push(
+      <IntermissionSlide
+        key={`int-r${r.n}`}
+        label={`Intermission · Round 0${r.n}`}
+        nextRound={next?.n}
+        nextTitle={next?.title}
+        nextLabel={next ? undefined : "Final Tally · Winners Revealed"}
+        tweaks={tweaks}
+        accent={accent}
+      />
+    );
+
     // Recap slides per round. Most rounds split 5+5; round 5's prompts run
     // long enough that 5-per-slide gets cramped, so it splits 3+3+4.
     const recapSplits = recapSplitsFor(r);
@@ -157,28 +174,12 @@ function App() {
           roundTitle={r.title}
           questions={r.questions.slice(start, end)}
           startIndex={start}
-          totalQuestions={r.questions.length}
           part={String.fromCharCode(65 + i)}
           tweaks={tweaks}
           accent={accent}
         />
       );
     });
-
-    // Intermission after rounds 2, 3, 4 (not after final round)
-    if (idx < rounds.length - 1) {
-      const next = rounds[idx + 1];
-      slides.push(
-        <IntermissionSlide
-          key={`int-${next.n}`}
-          label={`Intermission · Before R${next.n}`}
-          nextRound={next.n}
-          nextTitle={next.title}
-          tweaks={tweaks}
-          accent={accent}
-        />
-      );
-    }
   });
 
   // End — normal sequential close. Tiebreakers live past this slide, only
@@ -244,7 +245,7 @@ function App() {
           {tweaks.showTimer && (
             <TweakSlider
               label="Timer seconds"
-              min={15} max={120} step={5}
+              min={15} max={90} step={5}
               value={tweaks.timerSeconds}
               onChange={(v) => setTweak("timerSeconds", v)}
             />

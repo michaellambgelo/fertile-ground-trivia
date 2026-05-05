@@ -821,10 +821,10 @@ function buildSlideOutline(rounds, tiebreakers = []) {
     { key: 'costume', label: 'Costume Contest' },
     { key: 'r1-open', label: 'Round 1 Opener — Picture Round' },
     { key: 'r1-instr', label: 'Round 1 Instructions' },
+    { key: 'int-r1', label: 'Intermission · Round 1 (collect sheets)' },
     { key: 'r1-recap', label: 'Picture Round Recap (5×2 grid)' },
-    { key: 'int-r2', label: 'Intermission · Before Round 2' },
   ];
-  rounds.forEach((r, idx) => {
+  rounds.forEach((r) => {
     list.push({ key: `r${r.n}-open`, label: `Round ${r.n} Opener — ${r.title}` });
     r.questions.forEach((prompt, qi) => {
       list.push({
@@ -832,6 +832,10 @@ function buildSlideOutline(rounds, tiebreakers = []) {
         label: `Round ${r.n} · Question ${qi + 1} / 10`,
         detail: prompt,
       });
+    });
+    list.push({
+      key: `int-r${r.n}`,
+      label: `Intermission · Round ${r.n} (collect sheets)`,
     });
     recapSplitsFor(r).forEach(([start, end], i) => {
       const part = String.fromCharCode(65 + i);
@@ -841,10 +845,6 @@ function buildSlideOutline(rounds, tiebreakers = []) {
         label: `Round ${r.n} Recap ${part} — ${range}`,
       });
     });
-    if (idx < rounds.length - 1) {
-      const next = rounds[idx + 1];
-      list.push({ key: `int-${next.n}`, label: `Intermission · Before Round ${next.n}` });
-    }
   });
   list.push({ key: 'end', label: 'End — May the Force Be With You' });
   // Tiebreakers live past the End slide and are only reached if needed.

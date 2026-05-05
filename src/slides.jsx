@@ -879,10 +879,9 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, ki
 // One round produces two of these slides (questions 1–5, then 6–10) so
 // each prompt can wrap fully without being truncated.
 // ============================================================
-function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex = 0, totalQuestions = 10, part = "A" }) {
+function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex = 0, part = "A" }) {
   const start = startIndex + 1;
   const end = startIndex + questions.length;
-  const showFooterHint = end >= totalQuestions; // only on the last recap of the round
   return (
     <section data-label={`R${round} Recap ${part}`}>
       <div style={slideBase}>
@@ -944,14 +943,6 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex =
             ))}
           </div>
 
-          {showFooterHint && (
-            <div style={{
-              marginTop: 18, fontFamily: displayFont, fontSize: TYPE_SCALE.small,
-              color: PALETTE.paperDim, letterSpacing: "0.32em", textTransform: "uppercase",
-            }}>
-              Hand answer sheets to the hosts before we move on.
-            </div>
-          )}
         </div>
 
         <FooterBar
@@ -967,7 +958,8 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex =
 // ============================================================
 // SLIDE: INTERMISSION
 // ============================================================
-function IntermissionSlide({ nextRound, nextTitle, tweaks, accent, label }) {
+function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, label }) {
+  const upNextText = nextLabel || `Round ${String(nextRound).padStart(2, "0")} · ${nextTitle}`;
   return (
     <section data-label={label}>
       <div style={slideBase}>
@@ -981,42 +973,47 @@ function IntermissionSlide({ nextRound, nextTitle, tweaks, accent, label }) {
         }}>
           <Eyebrow accentHex={accent.hex}>Intermission</Eyebrow>
           <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 200, lineHeight: 1.05,
-            color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 28,
+            fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
+            color: accent.hex, letterSpacing: "0.04em", marginTop: 24,
+            textShadow: `0 0 50px ${accent.glow}`,
+          }}>
+            SUBMIT.
+          </div>
+          <div style={{
+            fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
+            color: PALETTE.paper, letterSpacing: "0.04em",
             textShadow: `0 0 40px ${accent.glow}`,
           }}>
             STRETCH.
           </div>
           <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 200, lineHeight: 1.05,
-            color: accent.hex, letterSpacing: "0.04em",
+            fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
+            color: PALETTE.paper, letterSpacing: "0.04em",
             textShadow: `0 0 40px ${accent.glow}`,
           }}>
             REFILL.
           </div>
           <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 200, lineHeight: 1.05,
+            fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
             color: PALETTE.paper, letterSpacing: "0.04em",
             textShadow: `0 0 40px ${accent.glow}`,
           }}>
             REGROUP.
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 28, marginTop: 48 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 28, marginTop: 36 }}>
             <div style={{ height: 2, width: 180, background: PALETTE.paper, opacity: 0.4 }} />
             <Saber accentHex={accent.hex} length={120} thickness={10} />
             <div style={{ height: 2, width: 180, background: PALETTE.paper, opacity: 0.4 }} />
           </div>
 
           <div style={{
-            marginTop: 48, fontFamily: displayFont, fontSize: TYPE_SCALE.subtitle,
+            marginTop: 36, fontFamily: displayFont, fontSize: TYPE_SCALE.subtitle,
             color: PALETTE.paperDim, letterSpacing: "0.16em",
           }}>
-            Up next · Round {String(nextRound).padStart(2, "0")} · {nextTitle}
+            Up next · {upNextText}
           </div>
         </div>
-
-        <FooterBar left="Intermission" right={`Up Next · Round ${String(nextRound).padStart(2, "0")}`} accentHex={accent.hex} />
       </div>
     </section>
   );
