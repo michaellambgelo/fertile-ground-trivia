@@ -1,26 +1,26 @@
 // Round / question content. Default values + localStorage persistence.
 // Edits made in the /control window save here; both windows read from here.
 
-const STORAGE_KEY = 'star-wars-trivia.rounds';
-const TIEBREAKER_STORAGE_KEY = 'star-wars-trivia.tiebreakers';
+const STORAGE_KEY = 'trivia-scaffold.rounds';
+const TIEBREAKER_STORAGE_KEY = 'trivia-scaffold.tiebreakers';
 
 export const TIEBREAKER_COUNT = 3;
 
 export const DEFAULT_ROUNDS = [
   {
-    n: 2, title: "Original Trilogy",
-    subtitle: "Episodes IV, V, and VI — the films that started it all.",
+    n: 2, title: "Warm-Up Round",
+    subtitle: "A gentle start. Easy points to set the tone.",
     kicker: "10 Questions",
     questions: Array.from({ length: 10 }, (_, i) =>
-      `Question ${i + 1} for Round 2 · Original Trilogy. Replace this placeholder with your real prompt.`
+      `Placeholder question ${i + 1} for Round 2 · Warm-Up Round. Replace this with a real prompt.`
     ),
   },
   {
-    n: 3, title: "Prequel Era",
-    subtitle: "The Republic, the Jedi Council, and the rise of the Empire.",
+    n: 3, title: "Categories Round",
+    subtitle: "A mix of topics — keep an open mind.",
     kicker: "10 Questions",
     questions: Array.from({ length: 10 }, (_, i) =>
-      `Question ${i + 1} for Round 3 · Prequel Era. Replace this placeholder with your real prompt.`
+      `Placeholder question ${i + 1} for Round 3 · Categories Round. Replace this with a real prompt.`
     ),
   },
   {
@@ -28,15 +28,15 @@ export const DEFAULT_ROUNDS = [
     subtitle: "Who said it — and to whom?",
     kicker: "10 Questions",
     questions: Array.from({ length: 10 }, (_, i) =>
-      `Question ${i + 1} for Round 4 · Quotes & Catchphrases. Replace this placeholder with your real prompt.`
+      `Placeholder question ${i + 1} for Round 4 · Quotes & Catchphrases. Replace this with a real prompt.`
     ),
   },
   {
-    n: 5, title: "Deep Cuts",
-    subtitle: "For the diehards. Spinoffs, side characters, and obscure lore.",
+    n: 5, title: "Final Round",
+    subtitle: "The hardest questions. For the bragging rights.",
     kicker: "10 Questions · Tiebreaker Material",
     questions: Array.from({ length: 10 }, (_, i) =>
-      `Question ${i + 1} for Round 5 · Deep Cuts. Replace this placeholder with your real prompt.`
+      `Placeholder question ${i + 1} for Round 5 · Final Round. Replace this with a real prompt.`
     ),
   },
 ];
@@ -68,7 +68,7 @@ export function resetRounds() {
 // 3 placeholders by default; editable via the control window's editor.
 
 export const DEFAULT_TIEBREAKERS = Array.from({ length: TIEBREAKER_COUNT }, (_, i) =>
-  `Tiebreaker question ${i + 1}. Replace this placeholder with your real prompt.`
+  `Placeholder tiebreaker ${i + 1}. Replace this with a real prompt.`
 );
 
 export function loadTiebreakers() {
@@ -92,12 +92,20 @@ export function resetTiebreakers() {
   localStorage.removeItem(TIEBREAKER_STORAGE_KEY);
 }
 
-// Recap slide chunking — most rounds split into 5+5, round 5's longer prompts
-// split into 3+3+4 so each slide stays readable. Returns [[start, end], ...]
-// half-open ranges into the round's questions array.
+// Recap slide chunking — splits a round's questions into balanced chunks of
+// at most 5 each. Returns [[start, end], ...] half-open ranges into the
+// round's questions array. Generic across question-count so themed decks
+// with different round lengths get sensible recap slides automatically.
 export function recapSplitsFor(round) {
-  if (round.n === 5) return [[0, 3], [3, 6], [6, 10]];
-  return [[0, 5], [5, 10]];
+  const total = round.questions.length;
+  if (total <= 5) return [[0, total]];
+  if (total <= 10) {
+    const half = Math.ceil(total / 2);
+    return [[0, half], [half, total]];
+  }
+  const a = Math.ceil(total / 3);
+  const b = Math.ceil((total - a) / 2);
+  return [[0, a], [a, a + b], [a + b, total]];
 }
 
 // ---- Export / import ------------------------------------------------------
@@ -106,7 +114,7 @@ export function recapSplitsFor(round) {
 // between machines. Pictures intentionally not included — they're handled
 // by the Save Images to Disk flow on the Picture Round panel.
 
-export const QUESTIONS_EXPORT_TYPE = 'star-wars-trivia/questions';
+export const QUESTIONS_EXPORT_TYPE = 'trivia-scaffold/questions';
 export const QUESTIONS_EXPORT_VERSION = 1;
 
 export function buildQuestionsExport(rounds, tiebreakers) {
@@ -130,7 +138,7 @@ export function parseQuestionsImport(text) {
     throw new Error('Expected a JSON object at the top level.');
   }
   if (data.type !== QUESTIONS_EXPORT_TYPE) {
-    throw new Error('Not a Star Wars Trivia questions export (wrong "type").');
+    throw new Error('Not a Trivia Scaffold questions export (wrong "type").');
   }
   if (!Array.isArray(data.rounds) || data.rounds.length === 0) {
     throw new Error('"rounds" must be a non-empty array.');

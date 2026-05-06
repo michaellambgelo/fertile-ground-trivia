@@ -7,7 +7,7 @@
 // localStorage can be cleared.
 
 const COUNT = 10;
-const STORAGE_KEY = 'star-wars-trivia.pictures';
+const STORAGE_KEY = 'trivia-scaffold.pictures';
 
 // Static defaults — point to the predictable on-disk paths the editor's
 // "Save All to Disk" button writes to. If the file isn't there yet, the

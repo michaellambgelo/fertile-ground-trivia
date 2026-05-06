@@ -1,8 +1,10 @@
-# Star Wars Trivia
+# Trivia Scaffold
 
-A browser-only Star Wars trivia presentation deck for hosting a live trivia night. Built with React + Vite, rendered through a custom `<deck-stage>` web component that handles slide layout, navigation, scaling, and print-to-PDF.
+The theme-neutral source-of-truth for browser-only trivia presentation decks. **You probably don't run trivia events from this repo directly** — instead, run `/new-trivia-deck` to clone this scaffold to a `~/Workspace/<slug>-trivia` sibling and re-skin it with theme content (real questions, themed slide copy, theme palette).
 
-## Run
+The scaffold is runnable on its own (with placeholder questions and a "GENERIC EDITION" title slide) — useful for testing engine changes without a theme in the way.
+
+## Run standalone
 
 ```bash
 npm install
@@ -11,6 +13,21 @@ npm run build    # production bundle in dist/
 npm run preview  # serve dist/ for verification
 npm run lint     # ESLint
 ```
+
+Open `http://localhost:5173/` for the display, `http://localhost:5173/#/control` for the editor + presenter.
+
+## How themed decks are produced
+
+`/new-trivia-deck "Lord of the Rings"` (or any theme + arg combination) does roughly this:
+
+1. `cp -R ~/Workspace/trivia-scaffold ~/Workspace/lotr-trivia` (sibling at `<slug>-trivia`)
+2. Disconnects the new sibling's git remote.
+3. Renames `package.json` name, `BroadcastChannel` name (`trivia-scaffold` → `<slug>-trivia`), and `localStorage` keys (`trivia-scaffold.rounds` → `<slug>-trivia.rounds`, etc.) so siblings can run side-by-side without state collisions.
+4. Replaces theme-leak strings in `index.html`, `src/rounds.js` (`DEFAULT_ROUNDS` + `DEFAULT_TIEBREAKERS`), `src/slides.jsx` (`PALETTE`, `TitleSlide`, `EndSlide`, `RulesSlide`, `CostumeContestSlide`, `PictureRoundInstructions`), `src/App.jsx` (`int-r1` `nextTitle`, Round 1 opener subtitle), `src/ControlApp.jsx` (`buildSlideOutline` labels), and the README/CLAUDE docs.
+5. Removes `public/images/picture-*.png` so the picture round starts blank.
+6. Verifies via `npm run lint` and `npm run build`.
+
+The skill source lives at `~/.claude/skills/new-trivia-deck/SKILL.md`.
 
 ## Two windows: display + control
 
@@ -21,16 +38,6 @@ Open two browser windows on the same origin:
 
 The two windows talk to each other live via `BroadcastChannel` (built-in browser API, no server). Edits in the control window push to the display instantly. Navigation in the control window drives the display.
 
-### Live event setup
-
-1. Open the project in your browser. By default you land on the display.
-2. Open a new browser window, navigate to `#/control`, drag it to your laptop screen.
-3. Drag the display window to the projector / second display, then make it fullscreen (browser fullscreen, e.g. ⌃⌘F on macOS Chrome).
-4. Use the control window to:
-   - **Presenter** — Prev / Next / Reset, jump-to-slide via the slide list, control the question timer (pause / resume / reset / ±10s).
-   - **Edit Questions** — fill in real prompts; Save & Push to Display syncs them.
-   - **Picture Round** — paste images into 10 cells, copy or download the handout PNG, save the images to disk for production deployment.
-
 ### Picture Round workflow
 
 1. In the control window, switch to the **Picture Round** tab.
@@ -40,11 +47,7 @@ The two windows talk to each other live via `BroadcastChannel` (built-in browser
 5. **Download Handout PNG** — same image as a file.
 6. **Save Images to Disk** — downloads each pasted image with predictable names (`picture-01.png` … `picture-10.png`). Drop them into `public/images/` so the display can serve them statically and you can clear the localStorage paste buffer.
 
-The slide, the canvas handout, and the editor cell all use the same crop-position math (`object-position` percentages), so what you see in the editor is exactly what shows in the recap and on the printed sheet.
-
 ### Display controls (fallback)
-
-Keyboard / mouse shortcuts on the display window itself, in case you don't want the control window:
 
 - **← / →**, **Space**, **PgUp / PgDn** — navigate slides
 - **Home / End** — first / last slide
@@ -60,7 +63,7 @@ src/
 ├── main.jsx            entry — picks display vs control by URL hash
 ├── App.jsx             display: slide composition + broadcast wiring
 ├── ControlApp.jsx      control: presenter / editor / picture round tabs
-├── rounds.js           DEFAULT_ROUNDS + localStorage persistence
+├── rounds.js           DEFAULT_ROUNDS + localStorage persistence + recapSplitsFor
 ├── pictures.js         picture round data + paste buffer
 ├── handout.js          canvas-based PNG renderer for picture round handout
 ├── broadcast.js        BroadcastChannel helper + useBroadcast hook
@@ -69,10 +72,10 @@ src/
 └── tweaks-panel.jsx    floating tweaks panel + useTweaks hook
 ```
 
-Round / question content lives in `src/rounds.js` as `DEFAULT_ROUNDS`. Tiebreaker prompts live alongside as `DEFAULT_TIEBREAKERS` (3 sudden-death questions used after Round 5 if there's a tie). Edits made in the control window override the defaults via `localStorage` — they survive page reloads but stay local to the browser. To reset to defaults, click **Reset to Defaults** in the editor.
-
-Picture Round images live in `public/images/picture-01.png` … `picture-10.png` once you save them. Until then, pastes in the editor are kept in `localStorage` and the display reads from there.
-
 ## Tweaks panel
 
 The floating tweaks panel (bottom-right of the display window) is hidden by default. It activates when a parent window posts `__activate_edit_mode` — this is how the Claude Design host tool wires it up. Standalone, the panel won't appear unless that protocol fires.
+
+## History
+
+Forked from `~/Workspace/star-wars-trivia-game`, theme-neutralized to serve as the source-of-truth for `/new-trivia-deck`. The Star Wars deck is preserved in its original location as a runnable artifact.

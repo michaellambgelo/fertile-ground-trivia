@@ -341,7 +341,7 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
     const date = new Date().toISOString().slice(0, 10);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `star-wars-trivia-questions-${date}.json`;
+    a.download = `trivia-questions-${date}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -815,7 +815,7 @@ function Field({ label, value, onChange, multiline = false, compact = false }) {
 // ============================================================
 function buildSlideOutline(rounds, tiebreakers = []) {
   const list = [
-    { key: 'title', label: 'Title — May the Fourth' },
+    { key: 'title', label: 'Title — Welcome' },
     { key: 'rules', label: 'House Rules' },
     { key: 'prize', label: 'Grand Prize — $100 Gift Card' },
     { key: 'costume', label: 'Costume Contest' },
@@ -829,7 +829,7 @@ function buildSlideOutline(rounds, tiebreakers = []) {
     r.questions.forEach((prompt, qi) => {
       list.push({
         key: `r${r.n}-q${qi + 1}`,
-        label: `Round ${r.n} · Question ${qi + 1} / 10`,
+        label: `Round ${r.n} · Question ${qi + 1} / ${r.questions.length}`,
         detail: prompt,
       });
     });
@@ -846,7 +846,7 @@ function buildSlideOutline(rounds, tiebreakers = []) {
       });
     });
   });
-  list.push({ key: 'end', label: 'End — May the Force Be With You' });
+  list.push({ key: 'end', label: 'End — Thanks for Playing' });
   // Tiebreakers live past the End slide and are only reached if needed.
   list.push({ key: 'tb-intro', label: 'Tiebreakers — Final Wager (only if tied)' });
   tiebreakers.forEach((prompt, i) => {

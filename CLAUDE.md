@@ -1,18 +1,17 @@
 # CLAUDE.md
 
-Browser-only Star Wars trivia presentation deck. Originally handed off from Claude Design as 4 standalone files (CDN React + Babel + window globals); migrated to Vite + ES modules.
+The theme-neutral source-of-truth for browser-only trivia presentation decks. Forked from `~/Workspace/star-wars-trivia-game` (originally handed off from Claude Design as 4 standalone files; CDN React + Babel + window globals; migrated to Vite + ES modules) and stripped of theme content. **Cloned by `/new-trivia-deck` to produce themed sibling decks at `~/Workspace/<slug>-trivia`** — don't host events from this repo directly; spin up a themed sibling instead.
 
 ## Stack
 
 - React 18 + JSX (no TypeScript) + Vite 5
 - Custom `<deck-stage>` web component (vanilla JS) for slide layout, nav, scaling, print
 - ESLint 9 (flat config)
-- No deploy target yet
 
 ## Commands
 
 ```bash
-npm run dev      # Vite dev (localhost:5173)
+npm run dev      # Vite dev (localhost:5173) — runs the scaffold standalone with placeholder content
 npm run build    # production bundle
 npm run preview  # serve built bundle
 npm run lint     # ESLint
@@ -27,7 +26,7 @@ The app has two views, switched by URL hash:
 
 `src/main.jsx` reads `window.location.hash` and renders the appropriate root. A `hashchange` listener triggers full reload so each mode boots cleanly.
 
-The two windows talk via `BroadcastChannel` (channel name `star-wars-trivia`). See `src/broadcast.js` for the helper. Message types in use:
+The two windows talk via `BroadcastChannel` (channel name `trivia-scaffold` in the scaffold; the skill renames this to `<slug>-trivia` per cloned sibling so multiple decks can run side-by-side without messages crossing). See `src/broadcast.js`. Message types in use:
 
 | type             | direction        | payload                                               |
 |------------------|------------------|-------------------------------------------------------|
@@ -47,16 +46,16 @@ The two windows talk via `BroadcastChannel` (channel name `star-wars-trivia`). S
 ## Architecture notes
 
 - `src/main.jsx` imports `./deck-stage.js` for side effect — this registers the `<deck-stage>` custom element before React mounts.
-- `src/App.jsx` composes the slide list, holds a `useRef` on the `<deck-stage>`, listens for nav/content broadcasts, and forwards `slidechange` events to the control window.
-- `src/ControlApp.jsx` has two tabs (Presenter, Edit Questions). Editor edits are buffered (`dirty` flag) and only push to display when the user clicks Save.
-- `src/rounds.js` — `DEFAULT_ROUNDS` + `loadRounds`/`saveRounds`/`resetRounds`. Persists to `localStorage` under `star-wars-trivia.rounds`. Also exports `DEFAULT_TIEBREAKERS` (3 sudden-death prompts) + `loadTiebreakers`/`saveTiebreakers`/`resetTiebreakers` (key `star-wars-trivia.tiebreakers`).
-- `src/pictures.js` — picture round data layer. `DEFAULT_PICTURE_ITEMS` always points to `/images/picture-NN.png` (the predictable on-disk paths). `loadPastes`/`savePastes`/`clearPastes` manage a 10-slot paste buffer in `localStorage` (`star-wars-trivia.pictures`). Paste shape: `{ dataUrl, caption, position: { x, y } }` where `x`/`y` are 0-100 percentages (default 50/50 = centered, matches `object-position: center`). `loadPastes` migrates pre-crop entries forward by defaulting missing `position`. `mergeItems(pastes)` resolves what the display actually renders: pasted data URLs win over disk paths, position falls back to centered.
+- `src/App.jsx` composes the slide list, holds a `useRef` on the `<deck-stage>`, listens for nav/content broadcasts, and forwards `slidechange` events to the control window. Per-question `total` is `r.questions.length` (not hardcoded), so themed siblings with different question counts work without engine changes.
+- `src/ControlApp.jsx` has three tabs (Presenter, Edit Questions, Picture Round). Editor edits are buffered (`dirty` flag) and only push to display when the user clicks Save.
+- `src/rounds.js` — `DEFAULT_ROUNDS` + `loadRounds`/`saveRounds`/`resetRounds`. Persists to `localStorage` under `trivia-scaffold.rounds`. Also exports `DEFAULT_TIEBREAKERS` (3 sudden-death prompts) + `loadTiebreakers`/`saveTiebreakers`/`resetTiebreakers` (key `trivia-scaffold.tiebreakers`). `recapSplitsFor` is generic across question count: `<=5` → 1 chunk, `<=10` → 2 chunks, `>10` → 3 chunks.
+- `src/pictures.js` — picture round data layer. `DEFAULT_PICTURE_ITEMS` always points to `/images/picture-NN.png` (the predictable on-disk paths). `loadPastes`/`savePastes`/`clearPastes` manage a 10-slot paste buffer in `localStorage` (`trivia-scaffold.pictures`). Paste shape: `{ dataUrl, caption, position: { x, y } }` where `x`/`y` are 0-100 percentages (default 50/50 = centered, matches `object-position: center`). `loadPastes` migrates pre-crop entries forward by defaulting missing `position`. `mergeItems(pastes)` resolves what the display actually renders: pasted data URLs win over disk paths, position falls back to centered.
 - `src/handout.js` — pure-canvas PNG renderer for the picture round handout. White background, dark borders, "PICTURE ROUND" title, no recap eyebrow / no FooterBar. Geometry constants (margins, gap, grid bounds, answer-area height) mirror the slide so the same image crops the same way in both surfaces. Honors `position` via the same percentage math as `object-position`. Exports `copyHandoutToClipboard`, `downloadHandoutPng`, `downloadAllImages`. No html2canvas dependency.
 - The `<img>` cells in `PictureRoundRecap` use an `onError` fallback (`PictureRecapCell` in `slides.jsx`) so missing disk-path images degrade to the "PHOTO" placeholder instead of a broken-image icon. They apply `objectPosition: ${x}% ${y}%` from the merged item position.
 - `PictureCell` in `ControlApp.jsx` implements drag-to-pan via pointer events: pointer-down records the starting `position`, pointer-move translates pixel deltas into objectPosition percentage deltas (inverted — drag right reveals more of the right edge of the source). A 3px movement threshold prevents accidental drags from a click. The ↺ reset button only appears when position differs from 50/50.
-- `src/QuestionSlide` (in `slides.jsx`): tracks `isActive` from `slidechange` events, holds local `seconds` + `paused` state. Only the active slide responds to timer broadcasts and emits `timer:state`. All 40 mounted question slides see the broadcasts but only the active one acts.
+- `src/QuestionSlide` (in `slides.jsx`): tracks `isActive` from `slidechange` events, holds local `seconds` + `paused` state. Only the active slide responds to timer broadcasts and emits `timer:state`. All mounted question slides see the broadcasts but only the active one acts.
 - `TWEAK_DEFAULTS` (in `App.jsx`) is wrapped in `/*EDITMODE-BEGIN*/ ... /*EDITMODE-END*/` markers — **do not remove**. The Claude Design host tool finds and rewrites this block on disk when a user adjusts tweaks via the panel.
-- `slides.jsx` is the design system: typography scale, accents, atmospheric overlays (Starfield, Halftone, Vignette), and 11 slide components. Inline styles only — no CSS files.
+- `slides.jsx` is the design system: typography scale, accents, atmospheric overlays (Starfield, Halftone, Vignette), and 11 slide components. Inline styles only — no CSS files. The `Saber` component is a stylized glowing-bar decoration; themed siblings may rename it (e.g. `Wand`, `Blade`) — keep in sync at all 3 references (definition + 2 call sites in `TitleSlide` and `IntermissionSlide`).
 - `tweaks-panel.jsx` owns its own postMessage host protocol (`__activate_edit_mode`, `__deactivate_edit_mode`, `__edit_mode_set_keys`). The panel won't appear standalone — it requires a parent frame to activate it. This is **not** the same channel as the BroadcastChannel above.
 - All slide components stay mounted with `visibility: hidden` so input/timer/video state survives navigation.
 
@@ -64,20 +63,48 @@ The two windows talk via `BroadcastChannel` (channel name `star-wars-trivia`). S
 
 `ControlApp.jsx`'s `buildSlideOutline()` mirrors `App.jsx`'s slide composition by hand. If you add or reorder slides in `App.jsx`, update `buildSlideOutline()` to match — otherwise the slide list in the presenter view drifts out of sync with what the display actually shows.
 
+## Anchor strings the skill replaces
+
+`/new-trivia-deck` finds and replaces the following exact strings via the Edit tool. **Don't edit these casually** — changes here will silently break the skill until SKILL.md is updated to match.
+
+| File | Anchor (scaffold value) | Slot |
+|---|---|---|
+| `index.html` | `<title>Trivia Night · Fertile Ground</title>` | `<title>` |
+| `src/broadcast.js` | `'trivia-scaffold'` (CHANNEL_NAME) | BroadcastChannel name |
+| `src/rounds.js` | `'trivia-scaffold.rounds'` / `'trivia-scaffold.tiebreakers'` | localStorage keys |
+| `src/rounds.js` | `'trivia-scaffold/questions'` | export type |
+| `src/rounds.js` | `'Not a Trivia Scaffold questions export'` | parseQuestionsImport error |
+| `src/rounds.js` | full `DEFAULT_ROUNDS` array | round content |
+| `src/rounds.js` | full `DEFAULT_TIEBREAKERS` array | tiebreaker content |
+| `src/pictures.js` | `'trivia-scaffold.pictures'` | localStorage key |
+| `src/slides.jsx` | full `PALETTE` object values (keys stay) | palette |
+| `src/slides.jsx` TitleSlide | `WELCOME` (68px) and `GENERIC EDITION` (220px); 92px `TRIVIA NIGHT` stays | title slide |
+| `src/slides.jsx` EndSlide | `THANKS FOR` and `PLAYING.` | end slide |
+| `src/slides.jsx` RulesSlide | rules III + IV `d` text | rules |
+| `src/slides.jsx` CostumeContestSlide | rule I–IV body copy | costume contest |
+| `src/slides.jsx` PictureRoundInstructions | step 03 `d` text | picture-round instructions |
+| `src/App.jsx` | Round 1 opener subtitle | picture-round flavor |
+| `src/App.jsx` | `nextTitle="Warm-Up Round"` | int-r1 next-round teaser (matches Round 2 title) |
+| `src/App.jsx` | `label="Accent"` (in TweakRadio) | accent picker label |
+| `src/ControlApp.jsx` | `'Title — Welcome'` / `'End — Thanks for Playing'` | buildSlideOutline labels |
+| `src/ControlApp.jsx` | `\`trivia-questions-${date}.json\`` | export filename |
+| `package.json` | `"trivia-scaffold"` (name) | package name |
+
+The internal `ACCENTS` keys (`saber-blue`, `saber-green`, `saber-red`, `saber-gold`) are **not** anchor strings — they're internal preset color identifiers, not user-visible (the picker label is the one that says "Accent" / "Blue" / "Green" / etc.). Renaming touches the EDITMODE-BEGIN/EDITMODE-END block; the skill leaves them alone.
+
 ## Lint warnings
 
-`npm run lint` exits clean (zero errors) but reports ~9 warnings in handoff design code (unused destructured props, empty catches in deck-stage). These are intentional design-system extension points or defensive code. Don't suppress globally; address case-by-case if cleanup is desired.
+`npm run lint` exits clean (zero errors) but reports ~7 warnings in handoff design code (unused destructured props, empty catches in deck-stage). These are intentional design-system extension points or defensive code. Don't suppress globally; address case-by-case if cleanup is desired.
 
-## Content
+## Content (scaffold defaults)
 
-`DEFAULT_ROUNDS` in `src/rounds.js` ships with placeholder strings (40 questions across 4 themed rounds). Real content can be entered through the `/#/control` editor (saved to `localStorage`) or by editing `DEFAULT_ROUNDS` directly. Same pattern for `DEFAULT_TIEBREAKERS` (3 sudden-death prompts).
-
-Total slide count: ~64. Order: title, rules, prize, costume contest, R1 opener, R1 instructions, picture round recap, intermission to R2, then for each of rounds 2–5: opener + 10 questions + recap + (intermission unless final), then tiebreaker intro + 3 tiebreaker question slides, then end.
+`DEFAULT_ROUNDS` ships with 4 generic rounds × 10 placeholder strings each, plus 3 placeholder tiebreakers. Slide count: ~64 (title, rules, prize, costume contest, R1 opener+instructions+intermission+recap, then for R2–R5: opener + 10 questions + intermission + recap, then tiebreaker intro + 3 tiebreaker question slides + end). Themed siblings replace question content but keep the same shape.
 
 `QuestionSlide` accepts a `kind` prop (`"round"` default, `"tiebreaker"` for sudden death). Tiebreaker variant changes the header text from "ROUND XX · QUESTION YY · OF ZZ" to "TIEBREAKER · QUESTION YY · OF ZZ", changes the FooterBar to "Sudden Death" / "Tiebreaker YY / ZZ", and uses `data-label="TIEBREAKER YY"` so `App.jsx`'s slidechange regex (`/^(R\d+ Q\d+|TIEBREAKER \d+)/`) keeps the timer enabled on tiebreaker slides like it does on regular question slides.
 
 ## What this project is NOT
 
-- Not deployed anywhere yet (no GitHub Pages / Firebase config).
+- Not a runnable themed deck — `/new-trivia-deck` produces those.
+- Not deployed anywhere (no GitHub Pages / Firebase config).
 - Not tested (no test framework set up).
 - Not using TypeScript by intent — keep it JSX.

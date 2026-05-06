@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { broadcast, useBroadcast } from './broadcast.js';
 
 // ============================================================
-// DESIGN SYSTEM — Retro pulp / vintage poster, saber-blue accent
+// DESIGN SYSTEM — Theme-neutral scaffold; clone via /new-trivia-deck and override PALETTE
 // ============================================================
 const TYPE_SCALE = {
   display: 132,   // hero numerals
@@ -38,12 +38,12 @@ const ACCENTS = {
 };
 
 const PALETTE = {
-  ink: "#0B0E1A",            // deep space navy-black
-  inkDeep: "#06080F",
-  paper: "#F2E9D8",          // cream pulp paper
-  paperDim: "#D8CDB6",
-  rust: "#B14A2A",            // pulp-poster rust
-  gold: "#E0A93B",            // crawl gold (always available as secondary)
+  ink: "#0B0E1A",            // deep slate
+  inkDeep: "#06080F",        // deepest ink
+  paper: "#F2E9D8",          // warm cream
+  paperDim: "#D8CDB6",       // dim paper
+  rust: "#B14A2A",           // accent rust
+  gold: "#E0A93B",           // accent gold (secondary)
 };
 
 // ============================================================
@@ -271,7 +271,7 @@ function TitleSlide({ tweaks, accent }) {
             fontSize: 68, letterSpacing: "0.18em", marginTop: 56, marginBottom: 8,
             textShadow: `0 0 24px ${accent.glow}`,
           }}>
-            MAY THE FOURTH
+            WELCOME
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 28, margin: "32px 0 28px" }}>
@@ -285,7 +285,7 @@ function TitleSlide({ tweaks, accent }) {
             letterSpacing: "0.02em", color: PALETTE.paper,
             textShadow: `0 0 40px ${accent.glow}, 0 0 100px ${accent.glow}`,
           }}>
-            STAR WARS
+            GENERIC EDITION
           </div>
           <div style={{
             fontFamily: displayFont, fontWeight: 600, fontSize: 92, lineHeight: 1,
@@ -324,8 +324,8 @@ function RulesSlide({ tweaks, accent }) {
   const rules = [
     { n: "I",   t: "No phones",       d: "Looking up answers will result in points being deducted at the hosts' discretion." },
     { n: "II",  t: "Spelling is best attempt",  d: "Misspellings are fine as long as the answer is unambiguous and correct." },
-    { n: "III", t: "Hosts are final",   d: "Jack and Michael have the last word on every ruling. No appeals to the High Council." },
-    { n: "IV",  t: "Have fun",         d: "It's a long time ago in a galaxy far, far away... You're allowed to be cheesy." },
+    { n: "III", t: "Hosts are final",   d: "The hosts have the last word on every ruling. No appeals." },
+    { n: "IV",  t: "Have fun",         d: "Lean in, get into it, and don't take any single question too seriously." },
   ];
   return (
     <section data-label="02 Rules">
@@ -463,10 +463,10 @@ function PrizeSlide({ tweaks, accent }) {
 // ============================================================
 function CostumeContestSlide({ tweaks, accent }) {
   const rules = [
-    { n: "I",   t: "Open to All Sentients", d: "Any guest can enter — you don't need to be on a trivia team to win." },
-    { n: "II",  t: "Galactic Canon",        d: "Costumes must be Star Wars themed. Original concepts welcome if the connection is clear." },
-    { n: "III", t: "Hosts Decide",          d: "Jack and Michael will pick Best Overall. No appeals to the High Council." },
-    { n: "IV",  t: "A Separate Bounty",     d: "One winner takes home a side prize, revealed before the trivia champion is crowned." },
+    { n: "I",   t: "Open to All Guests",    d: "Any guest can enter — you don't need to be on a trivia team to win." },
+    { n: "II",  t: "On-Theme Costumes",     d: "Costumes must fit tonight's theme. Original concepts welcome if the connection is clear." },
+    { n: "III", t: "Hosts Decide",          d: "The hosts will pick Best Overall. No appeals." },
+    { n: "IV",  t: "A Separate Prize",      d: "One winner takes home a side prize, revealed before the trivia champion is crowned." },
   ];
   return (
     <section data-label="04 Costume Contest">
@@ -608,7 +608,7 @@ function PictureRoundInstructions({ tweaks, accent }) {
   const steps = [
     { n: "01", t: "Form your team",   d: "Gather your group and pick a team name. Pun-heavy or theme-on-theme is encouraged." },
     { n: "02", t: "Collect your sheet", d: "One Round 1 picture sheet per team. Grab one from Jack or Michael at the host stand." },
-    { n: "03", t: "Identify the images", d: "Write the name of the character, ship, planet, or scene next to each numbered image." },
+    { n: "03", t: "Identify the images", d: "Write your answer in the space provided next to each numbered image." },
     { n: "04", t: "Return your answers", d: "Hand the sheet back to the hosts before Round 2 begins." },
   ];
   return (
@@ -1244,14 +1244,14 @@ function EndSlide({ tweaks, accent }) {
             color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 36,
             textShadow: `0 0 50px ${accent.glow}`,
           }}>
-            MAY THE FORCE
+            THANKS FOR
           </div>
           <div style={{
             fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
             color: accent.hex, letterSpacing: "0.04em",
             textShadow: `0 0 50px ${accent.glow}`,
           }}>
-            BE WITH YOU.
+            PLAYING.
           </div>
 
           <div style={{

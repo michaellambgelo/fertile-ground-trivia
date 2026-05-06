@@ -90,7 +90,7 @@ function App() {
       label="05 Round 1 Opener"
       number={1}
       title="Picture Round"
-      subtitle="A galaxy of faces, ships, and places. Played from a paper sheet handed out by the hosts."
+      subtitle="A page of images. Played from a paper sheet handed out by the hosts."
       kicker="On Paper"
       tweaks={tweaks} accent={accent}
     />
@@ -103,7 +103,7 @@ function App() {
   // reveals them. Teases R2 (the next round after the picture-round recap).
   slides.push(
     <IntermissionSlide key="int-r1" label="Intermission · Round 01"
-      nextRound={2} nextTitle="Original Trilogy"
+      nextRound={2} nextTitle="Warm-Up Round"
       tweaks={tweaks} accent={accent}
     />
   );
@@ -138,7 +138,7 @@ function App() {
           key={`r${r.n}-q${qi + 1}`}
           round={r.n}
           q={qi + 1}
-          total={10}
+          total={r.questions.length}
           prompt={prompt}
           roundTitle={r.title}
           tweaks={tweaks}
@@ -219,7 +219,7 @@ function App() {
             onChange={(v) => setTweak("showStars", v)}
           />
           <TweakRadio
-            label="Saber accent"
+            label="Accent"
             value={tweaks.accent}
             onChange={(v) => setTweak("accent", v)}
             options={[
