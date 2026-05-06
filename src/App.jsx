@@ -16,8 +16,8 @@ import { broadcast, useBroadcast } from './broadcast.js';
 // EDITMODE TWEAK DEFAULTS
 // ============================================================
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "accent": "saber-blue",
-  "showStars": true,
+  "accent": "accent-blue",
+  "showStars": false,
   "showQNumbers": true,
   "showTimer": true,
   "timerSeconds": 90
@@ -32,7 +32,7 @@ function App() {
   const [pastes, setPastes] = useState(() => loadPastes());
   const [tiebreakers, setTiebreakers] = useState(() => loadTiebreakers());
   const pictureItems = mergeItems(pastes);
-  const accent = ACCENTS[tweaks.accent] || ACCENTS["saber-blue"];
+  const accent = ACCENTS[tweaks.accent] || ACCENTS["accent-blue"];
   const stageRef = useRef(null);
 
   // Receive content + nav commands from the /control window.
@@ -214,7 +214,7 @@ function App() {
       <TweaksPanel title="Tweaks">
         <TweakSection title="Atmosphere">
           <TweakToggle
-            label="Starfield background"
+            label="Ambient backdrop"
             value={tweaks.showStars}
             onChange={(v) => setTweak("showStars", v)}
           />
@@ -223,10 +223,10 @@ function App() {
             value={tweaks.accent}
             onChange={(v) => setTweak("accent", v)}
             options={[
-              { value: "saber-blue",  label: "Blue" },
-              { value: "saber-green", label: "Green" },
-              { value: "saber-red",   label: "Red" },
-              { value: "saber-gold",  label: "Gold" },
+              { value: "accent-blue",  label: "Blue" },
+              { value: "accent-green", label: "Green" },
+              { value: "accent-red",   label: "Red" },
+              { value: "accent-gold",  label: "Gold" },
             ]}
           />
         </TweakSection>

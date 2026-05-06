@@ -55,7 +55,7 @@ The two windows talk via `BroadcastChannel` (channel name `trivia-scaffold` in t
 - `PictureCell` in `ControlApp.jsx` implements drag-to-pan via pointer events: pointer-down records the starting `position`, pointer-move translates pixel deltas into objectPosition percentage deltas (inverted — drag right reveals more of the right edge of the source). A 3px movement threshold prevents accidental drags from a click. The ↺ reset button only appears when position differs from 50/50.
 - `src/QuestionSlide` (in `slides.jsx`): tracks `isActive` from `slidechange` events, holds local `seconds` + `paused` state. Only the active slide responds to timer broadcasts and emits `timer:state`. All mounted question slides see the broadcasts but only the active one acts.
 - `TWEAK_DEFAULTS` (in `App.jsx`) is wrapped in `/*EDITMODE-BEGIN*/ ... /*EDITMODE-END*/` markers — **do not remove**. The Claude Design host tool finds and rewrites this block on disk when a user adjusts tweaks via the panel.
-- `slides.jsx` is the design system: typography scale, accents, atmospheric overlays (Starfield, Halftone, Vignette), and 11 slide components. Inline styles only — no CSS files. The `Saber` component is a stylized glowing-bar decoration; themed siblings may rename it (e.g. `Wand`, `Blade`) — keep in sync at all 3 references (definition + 2 call sites in `TitleSlide` and `IntermissionSlide`).
+- `slides.jsx` is the design system: typography scale, accents, atmospheric overlays (`BackdropField`, `HalftoneOverlay`, `GrainOverlay`, `Vignette`), and 11 slide components. Inline styles only — no CSS files. The `AccentBar` component is a glowing horizontal bar with a centered diamond ornament (theme-neutral). Themed siblings may rename it (e.g. `Saber` for sci-fi, `Blade` for fantasy, `Wand` for magic) and override its visual — keep in sync at all 3 references (definition + 2 call sites in `TitleSlide` and `IntermissionSlide`). Likewise `BackdropField` is a deterministic dot pattern that can read as starfield / snowfall / embers / dust; the scaffold defaults `showStars: false` so themes opt in.
 - `tweaks-panel.jsx` owns its own postMessage host protocol (`__activate_edit_mode`, `__deactivate_edit_mode`, `__edit_mode_set_keys`). The panel won't appear standalone — it requires a parent frame to activate it. This is **not** the same channel as the BroadcastChannel above.
 - All slide components stay mounted with `visibility: hidden` so input/timer/video state survives navigation.
 
@@ -83,14 +83,19 @@ The two windows talk via `BroadcastChannel` (channel name `trivia-scaffold` in t
 | `src/slides.jsx` RulesSlide | rules III + IV `d` text | rules |
 | `src/slides.jsx` CostumeContestSlide | rule I–IV body copy | costume contest |
 | `src/slides.jsx` PictureRoundInstructions | step 03 `d` text | picture-round instructions |
+| `src/slides.jsx` `AccentBar` | optional rename + visual swap (rename hits 3 sites: definition + 2 call sites) | divider component |
+| `src/slides.jsx` `BackdropField` | optional rename if a theme metaphor fits ("Snowfall", "Embers", "Dust") | atmospheric component |
+| `src/slides.jsx` `ACCENTS` values | tune `hex`/`glow` per theme; keys (`accent-blue` etc.) stay verbatim | picker color tuning |
 | `src/App.jsx` | Round 1 opener subtitle | picture-round flavor |
 | `src/App.jsx` | `nextTitle="Warm-Up Round"` | int-r1 next-round teaser (matches Round 2 title) |
 | `src/App.jsx` | `label="Accent"` (in TweakRadio) | accent picker label |
+| `src/App.jsx` | `label="Ambient backdrop"` (in TweakToggle) | backdrop toggle label |
+| `src/App.jsx` `TWEAK_DEFAULTS` | `accent` value (default key) and `showStars` (true if theme suits a backdrop, false otherwise) — values only, do **not** alter the keys or the `EDITMODE-BEGIN/END` markers | runtime defaults |
 | `src/ControlApp.jsx` | `'Title — Welcome'` / `'End — Thanks for Playing'` | buildSlideOutline labels |
 | `src/ControlApp.jsx` | `\`trivia-questions-${date}.json\`` | export filename |
 | `package.json` | `"trivia-scaffold"` (name) | package name |
 
-The internal `ACCENTS` keys (`saber-blue`, `saber-green`, `saber-red`, `saber-gold`) are **not** anchor strings — they're internal preset color identifiers, not user-visible (the picker label is the one that says "Accent" / "Blue" / "Green" / etc.). Renaming touches the EDITMODE-BEGIN/EDITMODE-END block; the skill leaves them alone.
+The internal `ACCENTS` keys (`accent-blue`, `accent-green`, `accent-red`, `accent-gold`) are **not** theme-content anchors — they're internal preset color identifiers, not user-visible (the picker label says "Accent" with options "Blue / Green / Red / Gold"). Renaming the keys requires updating both `ACCENTS`, `App.jsx`'s `TWEAK_DEFAULTS.accent` (inside the EDITMODE block), the `ACCENTS[tweaks.accent] || ACCENTS["accent-blue"]` fallback, and the `TweakRadio` `options` array — keep them in sync if you do rename.
 
 ## Lint warnings
 

@@ -21,20 +21,20 @@ const SPACING = {
   itemGap: 28,
 };
 
-// Default palette — overridden by Tweaks
+// Default tweaks — overridden by the runtime tweaks panel
 const DEFAULTS = {
-  accent: "saber-blue",       // saber-blue | saber-green | saber-red | saber-gold
-  showStars: true,
+  accent: "accent-blue",      // accent-blue | accent-green | accent-red | accent-gold
+  showStars: false,
   showQNumbers: true,
   showTimer: false,
   timerSeconds: 30,
 };
 
 const ACCENTS = {
-  "saber-blue":  { hex: "#5BC8FF", glow: "rgba(91, 200, 255, 0.55)", name: "BLUE" },
-  "saber-green": { hex: "#7CFF8A", glow: "rgba(124, 255, 138, 0.55)", name: "GREEN" },
-  "saber-red":   { hex: "#FF5A5A", glow: "rgba(255, 90, 90, 0.6)",   name: "RED" },
-  "saber-gold":  { hex: "#FFC857", glow: "rgba(255, 200, 87, 0.55)", name: "GOLD" },
+  "accent-blue":  { hex: "#5BC8FF", glow: "rgba(91, 200, 255, 0.55)", name: "BLUE" },
+  "accent-green": { hex: "#7CFF8A", glow: "rgba(124, 255, 138, 0.55)", name: "GREEN" },
+  "accent-red":   { hex: "#FF5A5A", glow: "rgba(255, 90, 90, 0.6)",   name: "RED" },
+  "accent-gold":  { hex: "#FFC857", glow: "rgba(255, 200, 87, 0.55)", name: "GOLD" },
 };
 
 const PALETTE = {
@@ -65,10 +65,13 @@ const slideBase = {
 const displayFont = "'Oswald', 'Bebas Neue', Impact, sans-serif";
 
 // ============================================================
-// BACKGROUND ATMOSPHERE — Starfield + vignette + halftone
+// BACKGROUND ATMOSPHERE — BackdropField + vignette + halftone
+// Theme-neutral atmospherics. Themes that want a starfield, snowfall,
+// embers, or any other dot-pattern can keep BackdropField on; themes
+// where the dot pattern reads off-theme should leave showStars off.
 // ============================================================
-function Starfield({ visible = true, density = 1 }) {
-  // Pre-rendered star positions (deterministic) for performance & no flicker
+function BackdropField({ visible = true, density = 1 }) {
+  // Pre-rendered dot positions (deterministic) for performance & no flicker
   const stars = React.useMemo(() => {
     const arr = [];
     let seed = 7;
@@ -153,7 +156,7 @@ function SlideAtmosphere({ tweaks, accent, variant = "dark" }) {
   // variant: "dark" (default), "paper" (cream)
   return (
     <>
-      {variant === "dark" && tweaks.showStars && <Starfield visible={tweaks.showStars} />}
+      {variant === "dark" && tweaks.showStars && <BackdropField visible={tweaks.showStars} />}
       {variant === "dark" && <HalftoneOverlay opacity={0.04} />}
       <GrainOverlay opacity={variant === "paper" ? 0.25 : 0.16} />
       {variant === "dark" && <Vignette />}
@@ -222,27 +225,27 @@ function Eyebrow({ children, accentHex }) {
   );
 }
 
-function Saber({ accentHex, length = 540, thickness = 14, hilt = true }) {
-  // Stylized lightsaber bar — original design, abstract bar + hilt rectangles
+function AccentBar({ accentHex, length = 540, thickness = 14 }) {
+  // Glowing accent divider — minimal horizontal bar with a small diamond
+  // ornament centered on top. Theme-neutral by default; themes that want a
+  // hilt, sword silhouette, wand, or other ornament should swap this
+  // component or extend it via props.
+  const ornament = thickness * 1.4;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-      {hilt && (
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <div style={{ width: 22, height: thickness + 18, background: "#9aa3ad",
-            borderRadius: 2 }} />
-          <div style={{ width: 56, height: thickness + 12, background:
-            "linear-gradient(180deg, #cfd6de 0%, #6b7178 50%, #cfd6de 100%)",
-            borderRadius: 2 }} />
-          <div style={{ width: 14, height: thickness + 22, background: "#3d4248",
-            borderRadius: 2 }} />
-          <div style={{ width: 8, height: thickness + 8, background: "#1a1d22" }} />
-        </div>
-      )}
+    <div style={{ position: "relative", width: length, height: ornament, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{
         width: length, height: thickness,
-        background: `linear-gradient(90deg, ${accentHex} 0%, #ffffff 60%, #ffffff 100%)`,
-        boxShadow: `0 0 28px ${accentHex}, 0 0 56px ${accentHex}`,
+        background: accentHex,
+        boxShadow: `0 0 18px ${accentHex}, 0 0 36px ${accentHex}`,
         borderRadius: thickness,
+        opacity: 0.85,
+      }} />
+      <div style={{
+        position: "absolute", left: "50%", top: "50%",
+        width: ornament, height: ornament,
+        transform: "translate(-50%, -50%) rotate(45deg)",
+        background: accentHex,
+        boxShadow: `0 0 10px ${accentHex}`,
       }} />
     </div>
   );
@@ -276,7 +279,7 @@ function TitleSlide({ tweaks, accent }) {
 
           <div style={{ display: "flex", alignItems: "center", gap: 28, margin: "32px 0 28px" }}>
             <div style={{ flex: "0 0 auto", height: 2, width: 220, background: PALETTE.paper, opacity: 0.5 }} />
-            <Saber accentHex={accent.hex} length={120} thickness={10} />
+            <AccentBar accentHex={accent.hex} length={120} thickness={10} />
             <div style={{ flex: "0 0 auto", height: 2, width: 220, background: PALETTE.paper, opacity: 0.5 }} />
           </div>
 
@@ -1011,7 +1014,7 @@ function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, la
 
           <div style={{ display: "flex", alignItems: "center", gap: 28, marginTop: 36 }}>
             <div style={{ height: 2, width: 180, background: PALETTE.paper, opacity: 0.4 }} />
-            <Saber accentHex={accent.hex} length={120} thickness={10} />
+            <AccentBar accentHex={accent.hex} length={120} thickness={10} />
             <div style={{ height: 2, width: 180, background: PALETTE.paper, opacity: 0.4 }} />
           </div>
 
