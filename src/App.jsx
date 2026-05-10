@@ -10,17 +10,18 @@ import {
 } from './slides.jsx';
 import { loadRounds, loadTiebreakers, recapSplitsFor } from './rounds.js';
 import { loadPastes, mergeItems } from './pictures.js';
+import { loadMeta } from './meta.js';
 import { broadcast, useBroadcast } from './broadcast.js';
 
 // ============================================================
 // EDITMODE TWEAK DEFAULTS
 // ============================================================
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "accent": "accent-blue",
+  "accent": "accent-red",
   "showStars": false,
   "showQNumbers": true,
   "showTimer": true,
-  "timerSeconds": 90
+  "timerSeconds": 60
 }/*EDITMODE-END*/;
 
 // ============================================================
@@ -31,8 +32,9 @@ function App() {
   const [rounds, setRounds] = useState(() => loadRounds());
   const [pastes, setPastes] = useState(() => loadPastes());
   const [tiebreakers, setTiebreakers] = useState(() => loadTiebreakers());
+  const [meta, setMeta] = useState(() => loadMeta());
   const pictureItems = mergeItems(pastes);
-  const accent = ACCENTS[tweaks.accent] || ACCENTS["accent-blue"];
+  const accent = ACCENTS[tweaks.accent] || ACCENTS["accent-red"];
   const stageRef = useRef(null);
 
   // Receive content + nav commands from the /control window.
@@ -41,6 +43,7 @@ function App() {
     if (msg.type === 'rounds:update') setRounds(msg.payload);
     else if (msg.type === 'pictures:update') setPastes(msg.payload);
     else if (msg.type === 'tiebreakers:update') setTiebreakers(msg.payload);
+    else if (msg.type === 'meta:update') setMeta(msg.payload);
     else if (msg.type === 'nav:next') stage?.next();
     else if (msg.type === 'nav:prev') stage?.prev();
     else if (msg.type === 'nav:goto') stage?.goTo(msg.payload);
@@ -72,51 +75,50 @@ function App() {
   const slides = [];
 
   // 1. Title
-  slides.push(<TitleSlide key="title" tweaks={tweaks} accent={accent} />);
+  slides.push(<TitleSlide key="title" tweaks={tweaks} accent={accent} title={meta.title} />);
 
   // 2. Rules
   slides.push(<RulesSlide key="rules" tweaks={tweaks} accent={accent} />);
 
-  // 3. Prize
-  slides.push(<PrizeSlide key="prize" tweaks={tweaks} accent={accent} />);
+  // 3. Prize (toggleable)
+  if (meta.show.prize) {
+    slides.push(<PrizeSlide key="prize" tweaks={tweaks} accent={accent} />);
+  }
 
-  // 4. Costume Contest
-  slides.push(<CostumeContestSlide key="costume" tweaks={tweaks} accent={accent} />);
+  // 4. Costume Contest (toggleable)
+  if (meta.show.costumeContest) {
+    slides.push(<CostumeContestSlide key="costume" tweaks={tweaks} accent={accent} />);
+  }
 
-  // 5. Round 1 opener
-  slides.push(
-    <RoundOpener
-      key="r1-open"
-      label="05 Round 1 Opener"
-      number={1}
-      title="Picture Round"
-      subtitle="A page of images. Played from a paper sheet handed out by the hosts."
-      kicker="On Paper"
-      tweaks={tweaks} accent={accent}
-    />
-  );
-
-  // 6. Round 1 instructions
-  slides.push(<PictureRoundInstructions key="r1-instr" tweaks={tweaks} accent={accent} />);
-
-  // 7. Intermission — collect picture-round answer sheets BEFORE the recap
-  // reveals them. Teases R2 (the next round after the picture-round recap).
-  slides.push(
-    <IntermissionSlide key="int-r1" label="Intermission · Round 01"
-      nextRound={2} nextTitle="Warm-Up Round"
-      tweaks={tweaks} accent={accent}
-    />
-  );
-
-  // 8. Picture Round Recap — answers revealed after sheets are collected
-  slides.push(
-    <PictureRoundRecap
-      key="r1-recap"
-      items={pictureItems}
-      tweaks={tweaks}
-      accent={accent}
-    />
-  );
+  // 5-8. Picture Round (toggleable as a unit: opener + instructions + intermission + recap)
+  if (meta.show.pictureRound) {
+    slides.push(
+      <RoundOpener
+        key="r1-open"
+        label="05 Round 1 Opener"
+        number={1}
+        title="Picture Round"
+        subtitle="A page of images. Played from a paper sheet handed out by the hosts."
+        kicker="On Paper"
+        tweaks={tweaks} accent={accent}
+      />
+    );
+    slides.push(<PictureRoundInstructions key="r1-instr" tweaks={tweaks} accent={accent} />);
+    slides.push(
+      <IntermissionSlide key="int-r1" label="Intermission · Round 01"
+        nextRound={2} nextTitle="Warm-Up Round"
+        tweaks={tweaks} accent={accent}
+      />
+    );
+    slides.push(
+      <PictureRoundRecap
+        key="r1-recap"
+        items={pictureItems}
+        tweaks={tweaks}
+        accent={accent}
+      />
+    );
+  }
 
   // Rounds 2-5
   rounds.forEach((r, idx) => {
@@ -184,26 +186,28 @@ function App() {
 
   // End — normal sequential close. Tiebreakers live past this slide, only
   // reached by hitting Next when there's an actual tie at the end of play.
-  slides.push(<EndSlide key="end" tweaks={tweaks} accent={accent} />);
+  slides.push(<EndSlide key="end" tweaks={tweaks} accent={accent} end={meta.end} />);
 
   // Tiebreakers — Final Wager (Final Jeopardy style) after the End slide.
   // Skip past these unless teams are tied; advance into them only when needed.
-  slides.push(<TiebreakerIntroSlide key="tb-intro" tweaks={tweaks} accent={accent} />);
-  tiebreakers.forEach((prompt, i) => {
-    slides.push(
-      <QuestionSlide
-        key={`tb-q${i + 1}`}
-        kind="tiebreaker"
-        round={5}
-        q={i + 1}
-        total={tiebreakers.length}
-        prompt={prompt}
-        roundTitle="Final Wager"
-        tweaks={tweaks}
-        accent={accent}
-      />
-    );
-  });
+  if (meta.show.tiebreakers) {
+    slides.push(<TiebreakerIntroSlide key="tb-intro" tweaks={tweaks} accent={accent} />);
+    tiebreakers.forEach((prompt, i) => {
+      slides.push(
+        <QuestionSlide
+          key={`tb-q${i + 1}`}
+          kind="tiebreaker"
+          round={5}
+          q={i + 1}
+          total={tiebreakers.length}
+          prompt={prompt}
+          roundTitle="Final Wager"
+          tweaks={tweaks}
+          accent={accent}
+        />
+      );
+    });
+  }
 
   return (
     <>

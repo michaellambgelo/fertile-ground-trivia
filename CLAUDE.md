@@ -37,6 +37,7 @@ The two windows talk via `BroadcastChannel` (channel name `trivia-scaffold` in t
 | `slidechange`    | display → control | `{ index, total, label }`                             |
 | `pictures:update`| control → display | full pastes array (10 items, each `{ dataUrl, caption, position: {x, y} }`) |
 | `tiebreakers:update`| control → display | array of 3 tiebreaker prompt strings |
+| `meta:update`    | control → display | full meta object (`{ title, end, show }`) |
 | `timer:toggle`   | control → display | — (toggles paused on active question slide)           |
 | `timer:reset`    | control → display | — (resets to full duration)                           |
 | `timer:adjust`   | control → display | delta seconds (+10, -10)                              |
@@ -49,6 +50,7 @@ The two windows talk via `BroadcastChannel` (channel name `trivia-scaffold` in t
 - `src/App.jsx` composes the slide list, holds a `useRef` on the `<deck-stage>`, listens for nav/content broadcasts, and forwards `slidechange` events to the control window. Per-question `total` is `r.questions.length` (not hardcoded), so themed siblings with different question counts work without engine changes.
 - `src/ControlApp.jsx` has three tabs (Presenter, Edit Questions, Picture Round). Editor edits are buffered (`dirty` flag) and only push to display when the user clicks Save.
 - `src/rounds.js` — `DEFAULT_ROUNDS` + `loadRounds`/`saveRounds`/`resetRounds`. Persists to `localStorage` under `trivia-scaffold.rounds`. Also exports `DEFAULT_TIEBREAKERS` (3 sudden-death prompts) + `loadTiebreakers`/`saveTiebreakers`/`resetTiebreakers` (key `trivia-scaffold.tiebreakers`). `recapSplitsFor` is generic across question count: `<=5` → 1 chunk, `<=10` → 2 chunks, `>10` → 3 chunks.
+- `src/meta.js` — game-level meta (`title` text fields, `end` text fields, `show` toggles for prize/costume/pictureRound/tiebreakers). `loadMeta`/`saveMeta`/`resetMeta` (key `trivia-scaffold.meta`). `loadMeta` merges persisted state with `DEFAULT_META` so adding a new field doesn't break older saves. App.jsx loads on mount + listens for `meta:update`; ControlApp.jsx edits buffer-and-save like rounds and broadcasts on save. App.jsx conditionally composes Prize/Costume/PictureRound/Tiebreakers slides based on `meta.show`; if you add a new toggle, also update `buildSlideOutline()` in ControlApp.jsx to match.
 - `src/pictures.js` — picture round data layer. `DEFAULT_PICTURE_ITEMS` always points to `/images/picture-NN.png` (the predictable on-disk paths). `loadPastes`/`savePastes`/`clearPastes` manage a 10-slot paste buffer in `localStorage` (`trivia-scaffold.pictures`). Paste shape: `{ dataUrl, caption, position: { x, y } }` where `x`/`y` are 0-100 percentages (default 50/50 = centered, matches `object-position: center`). `loadPastes` migrates pre-crop entries forward by defaulting missing `position`. `mergeItems(pastes)` resolves what the display actually renders: pasted data URLs win over disk paths, position falls back to centered.
 - `src/handout.js` — pure-canvas PNG renderer for the picture round handout. White background, dark borders, "PICTURE ROUND" title, no recap eyebrow / no FooterBar. Geometry constants (margins, gap, grid bounds, answer-area height) mirror the slide so the same image crops the same way in both surfaces. Honors `position` via the same percentage math as `object-position`. Exports `copyHandoutToClipboard`, `downloadHandoutPng`, `downloadAllImages`. No html2canvas dependency.
 - The `<img>` cells in `PictureRoundRecap` use an `onError` fallback (`PictureRecapCell` in `slides.jsx`) so missing disk-path images degrade to the "PHOTO" placeholder instead of a broken-image icon. They apply `objectPosition: ${x}% ${y}%` from the merged item position.
@@ -77,9 +79,11 @@ The two windows talk via `BroadcastChannel` (channel name `trivia-scaffold` in t
 | `src/rounds.js` | full `DEFAULT_ROUNDS` array | round content |
 | `src/rounds.js` | full `DEFAULT_TIEBREAKERS` array | tiebreaker content |
 | `src/pictures.js` | `'trivia-scaffold.pictures'` | localStorage key |
+| `src/meta.js` | `'trivia-scaffold.meta'` | localStorage key |
+| `src/meta.js` `DEFAULT_META.title` | `eyebrow`, `hero` (was `WELCOME`), `edition` (was `GENERIC EDITION`), `hosts`, `footerDate` | title slide defaults — host can override at runtime via Edit Questions tab |
+| `src/meta.js` `DEFAULT_META.end` | `hero1` (was `THANKS FOR`), `hero2` (was `PLAYING.`), `subtitle` | end slide defaults — host can override at runtime |
 | `src/slides.jsx` | full `PALETTE` object values (keys stay) | palette |
-| `src/slides.jsx` TitleSlide | `WELCOME` (68px) and `GENERIC EDITION` (220px); 92px `TRIVIA NIGHT` stays | title slide |
-| `src/slides.jsx` EndSlide | `THANKS FOR` and `PLAYING.` | end slide |
+| `src/slides.jsx` TitleSlide | `TRIVIA NIGHT` (92px tagline, hardcoded) — the WELCOME / EDITION strings now live in `meta.js` defaults | title slide |
 | `src/slides.jsx` RulesSlide | rules III + IV `d` text | rules |
 | `src/slides.jsx` CostumeContestSlide | rule I–IV body copy | costume contest |
 | `src/slides.jsx` PictureRoundInstructions | step 03 `d` text | picture-round instructions |
@@ -91,7 +95,7 @@ The two windows talk via `BroadcastChannel` (channel name `trivia-scaffold` in t
 | `src/App.jsx` | `label="Accent"` (in TweakRadio) | accent picker label |
 | `src/App.jsx` | `label="Ambient backdrop"` (in TweakToggle) | backdrop toggle label |
 | `src/App.jsx` `TWEAK_DEFAULTS` | `accent` value (default key) and `showStars` (true if theme suits a backdrop, false otherwise) — values only, do **not** alter the keys or the `EDITMODE-BEGIN/END` markers | runtime defaults |
-| `src/ControlApp.jsx` | `'Title — Welcome'` / `'End — Thanks for Playing'` | buildSlideOutline labels |
+| `src/ControlApp.jsx` | `'Thanks for Playing'` (fallback in `buildSlideOutline` when `meta.end.hero1`+`hero2` are blank) | end-slide outline label fallback |
 | `src/ControlApp.jsx` | `\`trivia-questions-${date}.json\`` | export filename |
 | `package.json` | `"trivia-scaffold"` (name) | package name |
 

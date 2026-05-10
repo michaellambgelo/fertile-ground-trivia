@@ -23,27 +23,27 @@ const SPACING = {
 
 // Default tweaks — overridden by the runtime tweaks panel
 const DEFAULTS = {
-  accent: "accent-blue",      // accent-blue | accent-green | accent-red | accent-gold
+  accent: "accent-red",       // accent-blue | accent-green | accent-red | accent-gold
   showStars: false,
   showQNumbers: true,
   showTimer: false,
-  timerSeconds: 30,
+  timerSeconds: 60,
 };
 
 const ACCENTS = {
-  "accent-blue":  { hex: "#5BC8FF", glow: "rgba(91, 200, 255, 0.55)", name: "BLUE" },
-  "accent-green": { hex: "#7CFF8A", glow: "rgba(124, 255, 138, 0.55)", name: "GREEN" },
-  "accent-red":   { hex: "#FF5A5A", glow: "rgba(255, 90, 90, 0.6)",   name: "RED" },
-  "accent-gold":  { hex: "#FFC857", glow: "rgba(255, 200, 87, 0.55)", name: "GOLD" },
+  "accent-blue":  { hex: "#1f4e96", glow: "rgba(31, 78, 150, 0.32)", name: "BLUE" },
+  "accent-green": { hex: "#1a6f3c", glow: "rgba(26, 111, 60, 0.32)", name: "GREEN" },
+  "accent-red":   { hex: "#e73826", glow: "rgba(231, 56, 38, 0.35)", name: "RED" },
+  "accent-gold":  { hex: "#a67510", glow: "rgba(166, 117, 16, 0.32)", name: "GOLD" },
 };
 
 const PALETTE = {
-  ink: "#0B0E1A",            // deep slate
-  inkDeep: "#06080F",        // deepest ink
-  paper: "#F2E9D8",          // warm cream
-  paperDim: "#D8CDB6",       // dim paper
-  rust: "#B14A2A",           // accent rust
-  gold: "#E0A93B",           // accent gold (secondary)
+  ink: "#fafaf7",            // off-white slide background (was deep slate)
+  inkDeep: "#f3f1ec",        // slightly tinted surface (alt panel)
+  paper: "#0e1c3a",          // dark navy text (was warm cream)
+  paperDim: "#5b6577",        // muted secondary text
+  rust: "#e73826",           // scorer accent red
+  gold: "#a32519",           // scorer accent dim red
 };
 
 // ============================================================
@@ -147,7 +147,7 @@ function Vignette() {
   return (
     <div style={{
       position: "absolute", inset: 0, pointerEvents: "none",
-      background: "radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.55) 100%)",
+      background: "radial-gradient(ellipse at center, transparent 55%, rgba(14, 28, 58, 0.12) 100%)",
     }} />
   );
 }
@@ -254,7 +254,8 @@ function AccentBar({ accentHex, length = 540, thickness = 14 }) {
 // ============================================================
 // SLIDE: TITLE
 // ============================================================
-function TitleSlide({ tweaks, accent }) {
+function TitleSlide({ tweaks, accent, title }) {
+  const t = title || {};
   return (
     <section data-label="01 Title">
       <div style={slideBase}>
@@ -267,15 +268,17 @@ function TitleSlide({ tweaks, accent }) {
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
           textAlign: "center",
         }}>
-          <Eyebrow accentHex={accent.hex}>Presented at Fertile Ground</Eyebrow>
+          {t.eyebrow && <Eyebrow accentHex={accent.hex}>{t.eyebrow}</Eyebrow>}
 
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, color: PALETTE.paper,
-            fontSize: 68, letterSpacing: "0.18em", marginTop: 56, marginBottom: 8,
-            textShadow: `0 0 24px ${accent.glow}`,
-          }}>
-            WELCOME
-          </div>
+          {t.hero && (
+            <div style={{
+              fontFamily: displayFont, fontWeight: 700, color: PALETTE.paper,
+              fontSize: 68, letterSpacing: "0.18em", marginTop: 56, marginBottom: 8,
+              textShadow: `0 0 24px ${accent.glow}`,
+            }}>
+              {t.hero}
+            </div>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 28, margin: "32px 0 28px" }}>
             <div style={{ flex: "0 0 auto", height: 2, width: 220, background: PALETTE.paper, opacity: 0.5 }} />
@@ -283,13 +286,15 @@ function TitleSlide({ tweaks, accent }) {
             <div style={{ flex: "0 0 auto", height: 2, width: 220, background: PALETTE.paper, opacity: 0.5 }} />
           </div>
 
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.92,
-            letterSpacing: "0.02em", color: PALETTE.paper,
-            textShadow: `0 0 40px ${accent.glow}, 0 0 100px ${accent.glow}`,
-          }}>
-            GENERIC EDITION
-          </div>
+          {t.edition && (
+            <div style={{
+              fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.92,
+              letterSpacing: "0.02em", color: PALETTE.paper,
+              textShadow: `0 0 40px ${accent.glow}, 0 0 100px ${accent.glow}`,
+            }}>
+              {t.edition}
+            </div>
+          )}
           <div style={{
             fontFamily: displayFont, fontWeight: 600, fontSize: 92, lineHeight: 1,
             letterSpacing: "0.42em", color: accent.hex, marginTop: 12,
@@ -298,21 +303,23 @@ function TitleSlide({ tweaks, accent }) {
             TRIVIA NIGHT
           </div>
 
-          <div style={{
-            marginTop: 88, display: "flex", alignItems: "center", gap: 22,
-            fontFamily: displayFont, fontSize: TYPE_SCALE.meta, letterSpacing: "0.36em",
-            textTransform: "uppercase", color: PALETTE.paperDim,
-          }}>
-            <span>Hosted by</span>
-            <span style={{ width: 8, height: 8, background: accent.hex, borderRadius: 999,
-              boxShadow: `0 0 10px ${accent.hex}` }} />
-            <span style={{ color: PALETTE.paper, fontWeight: 600 }}>Jack Smith &nbsp;·&nbsp; Michael Lamb</span>
-          </div>
+          {t.hosts && (
+            <div style={{
+              marginTop: 88, display: "flex", alignItems: "center", gap: 22,
+              fontFamily: displayFont, fontSize: TYPE_SCALE.meta, letterSpacing: "0.36em",
+              textTransform: "uppercase", color: PALETTE.paperDim,
+            }}>
+              <span>Hosted by</span>
+              <span style={{ width: 8, height: 8, background: accent.hex, borderRadius: 999,
+                boxShadow: `0 0 10px ${accent.hex}` }} />
+              <span style={{ color: PALETTE.paper, fontWeight: 600 }}>{t.hosts}</span>
+            </div>
+          )}
         </div>
 
         <FooterBar
           left="Fertile Ground"
-          right="May 4 · 2026"
+          right={t.footerDate || ""}
           accentHex={accent.hex}
         />
       </div>
@@ -708,7 +715,7 @@ function PictureRoundInstructions({ tweaks, accent }) {
 // ============================================================
 function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, kind = "round" }) {
   const isTiebreaker = kind === "tiebreaker";
-  const [seconds, setSeconds] = useState(tweaks.timerSeconds || 30);
+  const [seconds, setSeconds] = useState(tweaks.timerSeconds || 60);
   const [paused, setPaused] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const ref = useRef(null);
@@ -732,7 +739,7 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, ki
   // leak that stale value to the control window.
   useEffect(() => {
     if (!isActive) return;
-    const fresh = tweaks.timerSeconds || 30;
+    const fresh = tweaks.timerSeconds || 60;
     setSeconds(fresh);
     setPaused(false);
     broadcast('timer:state', { enabled: !!tweaks.showTimer, seconds: fresh, paused: false });
@@ -750,7 +757,7 @@ function QuestionSlide({ round, q, total, prompt, roundTitle, tweaks, accent, ki
     if (!isActive) return;
     if (msg.type === 'timer:toggle') setPaused((p) => !p);
     else if (msg.type === 'timer:reset') {
-      setSeconds(tweaks.timerSeconds || 30);
+      setSeconds(tweaks.timerSeconds || 60);
       setPaused(false);
     } else if (msg.type === 'timer:adjust') {
       setSeconds((s) => Math.max(0, s + msg.payload));
@@ -1087,9 +1094,9 @@ function PictureRecapCell({ item, index, accent }) {
         <div style={{
           position: "absolute", bottom: 0, left: 0, right: 0,
           padding: "10px 14px",
-          background: `linear-gradient(180deg, transparent, ${PALETTE.ink}cc)`,
+          background: "linear-gradient(180deg, transparent, rgba(14, 28, 58, 0.85))",
           fontFamily: "'Inter', sans-serif", fontSize: 28, fontWeight: 500,
-          color: PALETTE.paper, letterSpacing: "0.02em",
+          color: "#fafaf7", letterSpacing: "0.02em",
         }}>
           {item.caption}
         </div>
@@ -1229,7 +1236,8 @@ function TiebreakerIntroSlide({ tweaks, accent }) {
 // ============================================================
 // SLIDE: END
 // ============================================================
-function EndSlide({ tweaks, accent }) {
+function EndSlide({ tweaks, accent, end }) {
+  const e = end || {};
   return (
     <section data-label="End">
       <div style={slideBase}>
@@ -1242,27 +1250,33 @@ function EndSlide({ tweaks, accent }) {
           alignItems: "center", textAlign: "center",
         }}>
           <Eyebrow accentHex={accent.hex}>End of Game</Eyebrow>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
-            color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 36,
-            textShadow: `0 0 50px ${accent.glow}`,
-          }}>
-            THANKS FOR
-          </div>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
-            color: accent.hex, letterSpacing: "0.04em",
-            textShadow: `0 0 50px ${accent.glow}`,
-          }}>
-            PLAYING.
-          </div>
+          {e.hero1 && (
+            <div style={{
+              fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
+              color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 36,
+              textShadow: `0 0 50px ${accent.glow}`,
+            }}>
+              {e.hero1}
+            </div>
+          )}
+          {e.hero2 && (
+            <div style={{
+              fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
+              color: accent.hex, letterSpacing: "0.04em",
+              textShadow: `0 0 50px ${accent.glow}`,
+            }}>
+              {e.hero2}
+            </div>
+          )}
 
-          <div style={{
-            marginTop: 76, fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
-            color: PALETTE.paperDim, letterSpacing: "0.36em",
-          }}>
-            HOSTS TALLYING SCORES · STAND BY
-          </div>
+          {e.subtitle && (
+            <div style={{
+              marginTop: 76, fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
+              color: PALETTE.paperDim, letterSpacing: "0.36em",
+            }}>
+              {e.subtitle}
+            </div>
+          )}
         </div>
 
         <FooterBar left="End of Game" right="Winner Announced Shortly" accentHex={accent.hex} />

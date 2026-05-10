@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS,
   loadTiebreakers, saveTiebreakers, resetTiebreakers, DEFAULT_TIEBREAKERS,
-  buildQuestionsExport, parseQuestionsImport, recapSplitsFor,
+  buildQuestionsExport, parseImport, buildCsvTemplate, recapSplitsFor,
 } from './rounds.js';
+import { loadMeta, saveMeta, resetMeta, DEFAULT_META } from './meta.js';
 import { loadPastes, savePastes, clearPastes, mergeItems, PICTURE_FILENAME } from './pictures.js';
 import {
   copyHandoutToClipboard, downloadHandoutPng, downloadAllImages, downloadAnswersHandoutPng,
@@ -37,6 +38,7 @@ const baseStyle = {
 export default function ControlApp() {
   const [rounds, setRounds] = useState(() => loadRounds());
   const [tiebreakers, setTiebreakers] = useState(() => loadTiebreakers());
+  const [meta, setMeta] = useState(() => loadMeta());
   const [pastes, setPastes] = useState(() => loadPastes());
   const [tab, setTab] = useState('present');
   const [currentSlide, setCurrentSlide] = useState({ index: 0, total: 0, label: '' });
@@ -53,6 +55,12 @@ export default function ControlApp() {
     setTiebreakers(next);
     saveTiebreakers(next);
     broadcast('tiebreakers:update', next);
+  }, []);
+
+  const commitMeta = useCallback((next) => {
+    setMeta(next);
+    saveMeta(next);
+    broadcast('meta:update', next);
   }, []);
 
   const commitPastes = useCallback((next) => {
@@ -81,14 +89,17 @@ export default function ControlApp() {
           timer={timer}
           rounds={rounds}
           tiebreakers={tiebreakers}
+          meta={meta}
         />
       )}
       {tab === 'edit' && (
         <EditorPanel
           rounds={rounds}
           tiebreakers={tiebreakers}
+          meta={meta}
           commitRounds={commitRounds}
           commitTiebreakers={commitTiebreakers}
+          commitMeta={commitMeta}
         />
       )}
       {tab === 'pictures' && (
@@ -154,8 +165,8 @@ function Header({ tab, setTab, currentSlide }) {
 // ============================================================
 // PRESENTER PANEL — nav + timer + slide list
 // ============================================================
-function PresenterPanel({ currentSlide, timer, rounds, tiebreakers }) {
-  const slideList = useMemo(() => buildSlideOutline(rounds, tiebreakers), [rounds, tiebreakers]);
+function PresenterPanel({ currentSlide, timer, rounds, tiebreakers, meta }) {
+  const slideList = useMemo(() => buildSlideOutline(rounds, tiebreakers, meta), [rounds, tiebreakers, meta]);
 
   return (
     <div style={{
@@ -280,10 +291,12 @@ function SlideList({ slideList, currentIndex }) {
 // ============================================================
 // EDITOR PANEL — long form, edit metadata + questions
 // ============================================================
-function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
+function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreakers, commitMeta }) {
   const [draft, setDraft] = useState(rounds);
   const [draftTiebreakers, setDraftTiebreakers] = useState(tiebreakers);
+  const [draftMeta, setDraftMeta] = useState(meta);
   const [dirty, setDirty] = useState(false);
+  const [csvImport, setCsvImport] = useState(null);
   const fileInputRef = useRef(null);
 
   // If the persisted data changes externally (e.g. another window saved), pull
@@ -294,6 +307,9 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
   useEffect(() => {
     if (!dirty) setDraftTiebreakers(tiebreakers);
   }, [tiebreakers, dirty]);
+  useEffect(() => {
+    if (!dirty) setDraftMeta(meta);
+  }, [meta, dirty]);
 
   const update = (path, value) => {
     setDirty(true);
@@ -311,41 +327,60 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
     setDraftTiebreakers((tb) => tb.map((t, idx) => (idx === i ? value : t)));
   };
 
+  const updateMeta = (section, field, value) => {
+    setDirty(true);
+    setDraftMeta((m) => ({ ...m, [section]: { ...m[section], [field]: value } }));
+  };
+
   const save = () => {
     commitRounds(draft);
     commitTiebreakers(draftTiebreakers);
+    commitMeta(draftMeta);
     setDirty(false);
   };
   const revert = () => {
     setDraft(rounds);
     setDraftTiebreakers(tiebreakers);
+    setDraftMeta(meta);
     setDirty(false);
   };
   const reset = () => {
-    if (!confirm('Reset all questions and tiebreakers to the original placeholders? This will discard your edits.')) return;
+    if (!confirm('Reset all questions, tiebreakers, and slide settings to the original placeholders? This will discard your edits.')) return;
     resetRounds();
     resetTiebreakers();
+    resetMeta();
     const freshRounds = loadRounds();
     const freshTiebreakers = loadTiebreakers();
+    const freshMeta = loadMeta();
     setDraft(freshRounds);
     setDraftTiebreakers(freshTiebreakers);
+    setDraftMeta(freshMeta);
     setDirty(false);
     commitRounds(freshRounds);
     commitTiebreakers(freshTiebreakers);
+    commitMeta(freshMeta);
   };
 
-  const onExport = () => {
-    const payload = buildQuestionsExport(draft, draftTiebreakers);
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const downloadFile = (filename, contents, mime) => {
+    const blob = new Blob([contents], { type: mime });
     const url = URL.createObjectURL(blob);
-    const date = new Date().toISOString().slice(0, 10);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `trivia-questions-${date}.json`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const onExport = () => {
+    const payload = buildQuestionsExport(draft, draftTiebreakers);
+    const date = new Date().toISOString().slice(0, 10);
+    downloadFile(`trivia-questions-${date}.json`, JSON.stringify(payload, null, 2), 'application/json');
+  };
+
+  const onDownloadTemplate = () => {
+    downloadFile('trivia-questions-template.csv', buildCsvTemplate(), 'text/csv');
   };
 
   const onImportClick = () => fileInputRef.current?.click();
@@ -357,16 +392,38 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const { rounds: nextRounds, tiebreakers: nextTb } = parseQuestionsImport(reader.result);
-        setDraft(nextRounds);
-        setDraftTiebreakers(nextTb);
-        setDirty(true);
+        const result = parseImport(reader.result, file.name);
+        if (result.kind === 'json') {
+          setDraft(result.rounds);
+          setDraftTiebreakers(result.tiebreakers);
+          setDirty(true);
+        } else {
+          setCsvImport({ categories: result.categories, buckets: result.buckets });
+        }
       } catch (err) {
         alert(`Import failed: ${err.message}`);
       }
     };
     reader.onerror = () => alert('Could not read file.');
     reader.readAsText(file);
+  };
+
+  const applyCsvMapping = (mapping) => {
+    const { buckets } = csvImport;
+    const nextRounds = draft.map((r) => {
+      const cat = mapping[`r${r.n}`];
+      if (!cat || !buckets[cat]) return r;
+      return { ...r, questions: [...buckets[cat]] };
+    });
+    let nextTb = draftTiebreakers;
+    if (mapping.tb && buckets[mapping.tb]) {
+      const src = buckets[mapping.tb];
+      nextTb = draftTiebreakers.map((t, i) => (src[i] !== undefined ? src[i] : t));
+    }
+    setDraft(nextRounds);
+    setDraftTiebreakers(nextTb);
+    setDirty(true);
+    setCsvImport(null);
   };
 
   // Cmd/Ctrl+S → Save & Push (only when there are unsaved edits).
@@ -395,15 +452,57 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
         <span style={{ width: 1, height: 24, background: COLORS.border, margin: '0 4px' }} />
         <Button onClick={onExport}>Export</Button>
         <Button onClick={onImportClick}>Import…</Button>
+        <Button onClick={onDownloadTemplate} secondary>CSV Template</Button>
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/json,.json"
+          accept="application/json,.json,text/csv,.csv"
           onChange={onImportFile}
           style={{ display: 'none' }}
         />
         {dirty && <span style={{ color: COLORS.warn, fontSize: 12 }}>Unsaved changes</span>}
       </div>
+
+      <Card title="Slides to Include">
+        <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 8 }}>
+          Toggle off any optional slides this game won&apos;t use. Hidden slides are skipped in the deck and the slide outline.
+        </div>
+        <Toggle
+          label="Prize slide"
+          value={draftMeta.show.prize}
+          onChange={(v) => updateMeta('show', 'prize', v)}
+        />
+        <Toggle
+          label="Costume contest"
+          value={draftMeta.show.costumeContest}
+          onChange={(v) => updateMeta('show', 'costumeContest', v)}
+        />
+        <Toggle
+          label="Picture round (R1 opener + instructions + intermission + recap)"
+          value={draftMeta.show.pictureRound}
+          onChange={(v) => updateMeta('show', 'pictureRound', v)}
+        />
+        <Toggle
+          label="Tiebreakers (intro + 3 sudden-death questions)"
+          value={draftMeta.show.tiebreakers}
+          onChange={(v) => updateMeta('show', 'tiebreakers', v)}
+        />
+      </Card>
+
+      <Card title="Title Slide">
+        <Field label="Eyebrow" value={draftMeta.title.eyebrow} onChange={(v) => updateMeta('title', 'eyebrow', v)} />
+        <Field label="Hero" value={draftMeta.title.hero} onChange={(v) => updateMeta('title', 'hero', v)} />
+        <Field label="Edition" value={draftMeta.title.edition} onChange={(v) => updateMeta('title', 'edition', v)} />
+        <Field label="Hosts" value={draftMeta.title.hosts} onChange={(v) => updateMeta('title', 'hosts', v)} />
+        <Field label="Footer" value={draftMeta.title.footerDate} onChange={(v) => updateMeta('title', 'footerDate', v)} />
+      </Card>
+
+      <Card title="End Slide">
+        <Field label="Line 1" value={draftMeta.end.hero1} onChange={(v) => updateMeta('end', 'hero1', v)} />
+        <Field label="Line 2" value={draftMeta.end.hero2} onChange={(v) => updateMeta('end', 'hero2', v)} />
+        <Field label="Subtitle" value={draftMeta.end.subtitle} onChange={(v) => updateMeta('end', 'subtitle', v)} />
+      </Card>
+
       {draft.map((r, ri) => (
         <Card key={r.n} title={`Round ${r.n}`}>
           <Field label="Title" value={r.title} onChange={(v) => update([ri, 'title'], v)} />
@@ -440,6 +539,93 @@ function EditorPanel({ rounds, tiebreakers, commitRounds, commitTiebreakers }) {
           />
         ))}
       </Card>
+      {csvImport && (
+        <CsvImportModal
+          csvImport={csvImport}
+          rounds={draft}
+          onApply={applyCsvMapping}
+          onCancel={() => setCsvImport(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function CsvImportModal({ csvImport, rounds, onApply, onCancel }) {
+  const { categories, buckets } = csvImport;
+  const [mapping, setMapping] = useState(() => {
+    const init = { tb: '' };
+    rounds.forEach((r, idx) => {
+      init[`r${r.n}`] = categories[idx] || '';
+    });
+    return init;
+  });
+  const setSlot = (key, value) => setMapping((m) => ({ ...m, [key]: value }));
+  const totalAssigned = Object.values(mapping).filter(Boolean).length;
+
+  const slots = [
+    ...rounds.map((r) => ({ key: `r${r.n}`, label: `Round ${r.n} — ${r.title || '(untitled)'}` })),
+    { key: 'tb', label: `Tiebreakers (uses first 3 questions)` },
+  ];
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+      padding: 24,
+    }}>
+      <div style={{
+        background: COLORS.panel, color: COLORS.text, border: `1px solid ${COLORS.border}`,
+        borderRadius: 10, width: 'min(640px, 100%)', maxHeight: '90vh',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{
+          padding: '14px 18px', borderBottom: `1px solid ${COLORS.border}`,
+          fontSize: 13, fontWeight: 600, letterSpacing: '0.04em',
+        }}>
+          CSV Import — Pick a Round for Each Category
+        </div>
+        <div style={{ padding: '14px 18px', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 12, color: COLORS.textDim }}>
+            Found {categories.length} {categories.length === 1 ? 'category' : 'categories'}: {' '}
+            {categories.map((c) => `${c} (${buckets[c].length})`).join(', ')}.
+            Rounds you don&apos;t map stay as they are.
+          </div>
+          {slots.map((s) => (
+            <label key={s.key} style={{
+              display: 'grid', gridTemplateColumns: '1fr 220px', gap: 12, alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 13 }}>{s.label}</span>
+              <select
+                value={mapping[s.key]}
+                onChange={(e) => setSlot(s.key, e.target.value)}
+                style={{
+                  padding: '6px 8px', background: COLORS.bg, color: COLORS.text,
+                  border: `1px solid ${COLORS.border}`, borderRadius: 6,
+                  fontFamily: 'inherit', fontSize: 13,
+                }}
+              >
+                <option value="">(keep current)</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>{c} ({buckets[c].length})</option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+        <div style={{
+          padding: '12px 18px', borderTop: `1px solid ${COLORS.border}`,
+          display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 12, color: COLORS.textDim, marginRight: 'auto' }}>
+            {totalAssigned === 0 ? 'No slots mapped yet.' : `${totalAssigned} ${totalAssigned === 1 ? 'slot' : 'slots'} will be replaced.`}
+          </span>
+          <Button onClick={onCancel} secondary>Cancel</Button>
+          <Button onClick={() => onApply(mapping)} primary disabled={totalAssigned === 0}>
+            Apply
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -782,6 +968,34 @@ function Button({ children, onClick, primary = false, secondary = false, disable
   );
 }
 
+function Toggle({ label, value, onChange }) {
+  return (
+    <label style={{
+      display: 'flex', alignItems: 'center', gap: 12, marginTop: 10,
+      cursor: 'pointer', userSelect: 'none',
+    }}>
+      <span style={{
+        position: 'relative', width: 36, height: 20, flex: '0 0 auto',
+        background: value ? COLORS.accent : COLORS.border, borderRadius: 999,
+        transition: 'background 120ms ease',
+      }}>
+        <span style={{
+          position: 'absolute', top: 2, left: value ? 18 : 2,
+          width: 16, height: 16, borderRadius: '50%', background: COLORS.bg,
+          transition: 'left 120ms ease',
+        }} />
+        <input
+          type="checkbox"
+          checked={value}
+          onChange={(e) => onChange(e.target.checked)}
+          style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+        />
+      </span>
+      <span style={{ fontSize: 13, color: COLORS.text }}>{label}</span>
+    </label>
+  );
+}
+
 function Field({ label, value, onChange, multiline = false, compact = false }) {
   const Tag = multiline ? 'textarea' : 'input';
   return (
@@ -813,17 +1027,27 @@ function Field({ label, value, onChange, multiline = false, compact = false }) {
 // can show a meaningful slide list and previews without rendering the slides.
 // Keep this in sync with App.jsx's slide composition.
 // ============================================================
-function buildSlideOutline(rounds, tiebreakers = []) {
+function buildSlideOutline(rounds, tiebreakers = [], meta = DEFAULT_META) {
+  const titleEdition = meta.title?.edition || DEFAULT_META.title.edition;
+  const endLines = `${meta.end?.hero1 || ''} ${meta.end?.hero2 || ''}`.trim();
   const list = [
-    { key: 'title', label: 'Title — Welcome' },
+    { key: 'title', label: `Title — ${titleEdition}` },
     { key: 'rules', label: 'House Rules' },
-    { key: 'prize', label: 'Grand Prize — $100 Gift Card' },
-    { key: 'costume', label: 'Costume Contest' },
-    { key: 'r1-open', label: 'Round 1 Opener — Picture Round' },
-    { key: 'r1-instr', label: 'Round 1 Instructions' },
-    { key: 'int-r1', label: 'Intermission · Round 1 (collect sheets)' },
-    { key: 'r1-recap', label: 'Picture Round Recap (5×2 grid)' },
   ];
+  if (meta.show?.prize ?? true) {
+    list.push({ key: 'prize', label: 'Grand Prize — $100 Gift Card' });
+  }
+  if (meta.show?.costumeContest ?? true) {
+    list.push({ key: 'costume', label: 'Costume Contest' });
+  }
+  if (meta.show?.pictureRound ?? true) {
+    list.push(
+      { key: 'r1-open', label: 'Round 1 Opener — Picture Round' },
+      { key: 'r1-instr', label: 'Round 1 Instructions' },
+      { key: 'int-r1', label: 'Intermission · Round 1 (collect sheets)' },
+      { key: 'r1-recap', label: 'Picture Round Recap (5×2 grid)' },
+    );
+  }
   rounds.forEach((r) => {
     list.push({ key: `r${r.n}-open`, label: `Round ${r.n} Opener — ${r.title}` });
     r.questions.forEach((prompt, qi) => {
@@ -846,16 +1070,17 @@ function buildSlideOutline(rounds, tiebreakers = []) {
       });
     });
   });
-  list.push({ key: 'end', label: 'End — Thanks for Playing' });
-  // Tiebreakers live past the End slide and are only reached if needed.
-  list.push({ key: 'tb-intro', label: 'Tiebreakers — Final Wager (only if tied)' });
-  tiebreakers.forEach((prompt, i) => {
-    list.push({
-      key: `tb-q${i + 1}`,
-      label: `Tiebreaker · Question ${i + 1} / ${tiebreakers.length}`,
-      detail: prompt,
+  list.push({ key: 'end', label: `End — ${endLines || 'Thanks for Playing'}` });
+  if (meta.show?.tiebreakers ?? true) {
+    list.push({ key: 'tb-intro', label: 'Tiebreakers — Final Wager (only if tied)' });
+    tiebreakers.forEach((prompt, i) => {
+      list.push({
+        key: `tb-q${i + 1}`,
+        label: `Tiebreaker · Question ${i + 1} / ${tiebreakers.length}`,
+        detail: prompt,
+      });
     });
-  });
+  }
   return list;
 }
 

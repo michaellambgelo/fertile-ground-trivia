@@ -165,3 +165,104 @@ export function parseQuestionsImport(text) {
     tiebreakers: [...data.tiebreakers],
   };
 }
+
+// ---- CSV writer template + import ---------------------------------------
+// Hosts hand off `buildCsvTemplate()` to writers; the writer fills "category"
+// + "question" cells (answers go in a separate, secret doc), and on import the
+// host maps each discovered category to a round.
+
+export function buildCsvTemplate() {
+  // Comment lines must stay in a single spreadsheet cell when the writer
+  // opens the CSV in Numbers/Excel. Any line that has a comma or a quote
+  // gets wrapped + escaped so it doesn't spill into column B.
+  const csvComment = (line) =>
+    line.includes(',') || line.includes('"')
+      ? `"${line.replace(/"/g, '""')}"`
+      : line;
+  const comments = [
+    '# TRIVIA QUESTIONS — WRITER TEMPLATE',
+    '',
+    '# Replace the categories and questions below with your own.',
+    '# Rows that share a category become one trivia round at import time.',
+    '# DO NOT write answers in this file — share answers with the host privately.',
+    '# If a question contains a comma, wrap the whole question in double quotes.',
+    '',
+  ].map(csvComment);
+  const body = [
+    'category,question',
+    'Category 1,Question 1',
+    'Category 1,Question 2',
+    'Category 1,Question 3',
+    'Category 2,Question 1',
+    'Category 2,Question 2',
+    '',
+  ];
+  return [...comments, ...body].join('\n');
+}
+
+function parseCsvRows(text) {
+  const rows = [];
+  let cur = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; continue; }
+        inQuotes = false;
+        continue;
+      }
+      field += ch;
+      continue;
+    }
+    if (ch === '"') { inQuotes = true; continue; }
+    if (ch === ',') { cur.push(field); field = ''; continue; }
+    if (ch === '\r') continue;
+    if (ch === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; continue; }
+    field += ch;
+  }
+  if (field.length > 0 || cur.length > 0) { cur.push(field); rows.push(cur); }
+  return rows;
+}
+
+export function parseQuestionsCsv(text) {
+  const rows = parseCsvRows(text)
+    .filter((r) => !(r.length === 1 && r[0].trim() === ''))
+    .filter((r) => !(r[0] && r[0].trim().startsWith('#')));
+  if (rows.length === 0) {
+    throw new Error('CSV is empty after stripping comments and blank lines.');
+  }
+  const header = rows[0].map((c) => c.trim().toLowerCase());
+  if (header[0] !== 'category' || header[1] !== 'question') {
+    throw new Error('CSV header must be "category,question" on the first non-comment row.');
+  }
+  const buckets = {};
+  const order = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const cat = (r[0] || '').trim();
+    const q = (r[1] || '').trim();
+    if (!cat || !q) continue;
+    if (!(cat in buckets)) { buckets[cat] = []; order.push(cat); }
+    buckets[cat].push(q);
+  }
+  if (order.length === 0) {
+    throw new Error('No question rows found. Add at least one row with a category and a question.');
+  }
+  return { categories: order, buckets };
+}
+
+export function parseImport(text, filename = '') {
+  const lower = filename.toLowerCase();
+  const startsObj = /^\s*\{/.test(text);
+  const isJsonByName = lower.endsWith('.json');
+  const isCsvByName = lower.endsWith('.csv');
+  if (isCsvByName && !isJsonByName) {
+    return { kind: 'csv', ...parseQuestionsCsv(text) };
+  }
+  if (isJsonByName || startsObj) {
+    return { kind: 'json', ...parseQuestionsImport(text) };
+  }
+  return { kind: 'csv', ...parseQuestionsCsv(text) };
+}
