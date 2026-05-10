@@ -13,7 +13,7 @@ const STORAGE_KEY = 'trivia-scaffold.pictures';
 // "Save All to Disk" button writes to. If the file isn't there yet, the
 // <img> 404s and the slide falls back to the placeholder.
 export const DEFAULT_PICTURE_ITEMS = Array.from({ length: COUNT }, (_, i) => ({
-  src: `/images/picture-${String(i + 1).padStart(2, '0')}.png`,
+  src: `${import.meta.env.BASE_URL}images/picture-${String(i + 1).padStart(2, '0')}.png`,
   caption: null,
 }));
 

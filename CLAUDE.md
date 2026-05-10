@@ -111,9 +111,14 @@ The internal `ACCENTS` keys (`accent-blue`, `accent-green`, `accent-red`, `accen
 
 `QuestionSlide` accepts a `kind` prop (`"round"` default, `"tiebreaker"` for sudden death). Tiebreaker variant changes the header text from "ROUND XX · QUESTION YY · OF ZZ" to "TIEBREAKER · QUESTION YY · OF ZZ", changes the FooterBar to "Sudden Death" / "Tiebreaker YY / ZZ", and uses `data-label="TIEBREAKER YY"` so `App.jsx`'s slidechange regex (`/^(R\d+ Q\d+|TIEBREAKER \d+)/`) keeps the timer enabled on tiebreaker slides like it does on regular question slides.
 
+## Deploy
+
+Auto-deploys to GitLab Pages on `gitlab.voidnet.dev` via `.gitlab-ci.yml` on every push to `main`. Subpath base is `/trivia-scaffold/` (set in `vite.config.js`); image fallbacks in `src/pictures.js` use `import.meta.env.BASE_URL` so they resolve in both dev (`/`) and prod (`/trivia-scaffold/`).
+
+Each visitor's browser gets its own isolated `localStorage` — the `/#/control` route is intentionally ungated because writes only land in the visitor's own browser, and every fresh session loads `DEFAULT_*` content. Themed siblings cloned by `/new-trivia-deck` need their own `base`, BroadcastChannel name, and `.gitlab-ci.yml` (the skill should mirror this pattern when next updated).
+
 ## What this project is NOT
 
 - Not a runnable themed deck — `/new-trivia-deck` produces those.
-- Not deployed anywhere (no GitHub Pages / Firebase config).
 - Not tested (no test framework set up).
 - Not using TypeScript by intent — keep it JSX.
