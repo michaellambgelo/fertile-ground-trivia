@@ -113,7 +113,7 @@ The internal `ACCENTS` keys (`accent-blue`, `accent-green`, `accent-red`, `accen
 
 ## Deploy
 
-Auto-deploys to GitLab Pages on `gitlab.voidnet.dev` via `.gitlab-ci.yml` on every push to `main`. Subpath base is `/trivia-scaffold/` (set in `vite.config.js`); image fallbacks in `src/pictures.js` use `import.meta.env.BASE_URL` so they resolve in both dev (`/`) and prod (`/trivia-scaffold/`).
+Auto-deploys to GitLab Pages via `.gitlab-ci.yml` on every push to `main`. Canonical home is `gitlab.com/michaellambgelo/trivia-scaffold`; live URL: `https://michaellambgelo.gitlab.io/trivia-scaffold/`. (A secondary `voidnet` remote at `gitlab.voidnet.dev/michaellamb-dev/trivia-scaffold` is kept for archival; pushes do not auto-mirror.) Subpath base is `/trivia-scaffold/` (set in `vite.config.js`); image fallbacks in `src/pictures.js` use `import.meta.env.BASE_URL` so they resolve in both dev (`/`) and prod (`/trivia-scaffold/`).
 
 Each visitor's browser gets its own isolated `localStorage` — the `/#/control` route is intentionally ungated because writes only land in the visitor's own browser, and every fresh session loads `DEFAULT_*` content. Themed siblings cloned by `/new-trivia-deck` need their own `base`, BroadcastChannel name, and `.gitlab-ci.yml` (the skill should mirror this pattern when next updated).
 
