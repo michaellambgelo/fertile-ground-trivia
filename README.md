@@ -115,7 +115,3 @@ src/
 ## Tweaks panel
 
 The floating tweaks panel (bottom-right of the display window) is hidden by default. It activates when a parent window posts `__activate_edit_mode` — this is how the Claude Design host tool wires it up. Standalone, the panel won't appear unless that protocol fires.
-
-## History
-
-Forked from `~/Workspace/star-wars-trivia-game`, theme-neutralized to serve as the source-of-truth for `/new-trivia-deck`. The Star Wars deck is preserved in its original location as a runnable artifact.
