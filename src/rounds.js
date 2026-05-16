@@ -41,8 +41,51 @@ export const DEFAULT_ROUNDS = [
   },
 ];
 
+// Barstool mode: 12 rounds × 2 questions = 24 questions. Two teams alternate
+// per question; on miss the other team gets one shot at the full point.
+// Round titles suggest variety (audio, scramble, visual) so hosts have a
+// menu of formats; each question can carry optional media (audioUrl,
+// imageUrl, videoUrl, displayHint) via the editor.
+const BARSTOOL_ROUND_TITLES = [
+  { title: "Warm-Up",            subtitle: "Easy points to set the tone." },
+  { title: "Categories",         subtitle: "A mix of topics — keep an open mind." },
+  { title: "Audio · 5 Seconds",  subtitle: "Identify the song from a five-second clip." },
+  { title: "Unscramble",         subtitle: "Jumbled letters — first to call it gets the point." },
+  { title: "Visual Cues",        subtitle: "What is it? Identify the image." },
+  { title: "Quotes",             subtitle: "Who said it — and from where?" },
+  { title: "Year Game",          subtitle: "Within five years gets the point." },
+  { title: "Standard Q&A",       subtitle: "Plain trivia. No tricks." },
+  { title: "Audio · 5 Seconds",  subtitle: "Another round of five-second clips." },
+  { title: "Pop Culture",        subtitle: "Movies, TV, music, internet." },
+  { title: "Final Five",         subtitle: "The hardest stretch. Buckle up." },
+  { title: "Lightning Round",    subtitle: "Snap answers. Move fast." },
+];
+
+export const DEFAULT_BARSTOOL_ROUNDS = BARSTOOL_ROUND_TITLES.map((meta, i) => ({
+  n: i + 1,
+  title: meta.title,
+  subtitle: meta.subtitle,
+  kicker: "2 Questions",
+  questions: Array.from({ length: 2 }, (_, qi) =>
+    `Placeholder question ${qi + 1} for Round ${i + 1} · ${meta.title}. Replace this with a real prompt.`
+  ),
+}));
+
+// Question shape is `string` (legacy) OR
+// `{ prompt, answer?, audioUrl?, imageUrl?, videoUrl?, displayHint? }`.
+// normalizeQuestion always returns the object form for rendering / editing.
+// Storage keeps whichever form the user wrote so legacy decks don't bloat.
+export function normalizeQuestion(q) {
+  if (typeof q === 'string') return { prompt: q };
+  return { ...q };
+}
+
+function cloneQuestion(q) {
+  return typeof q === 'string' ? q : { ...q };
+}
+
 function clone(rounds) {
-  return rounds.map((r) => ({ ...r, questions: [...r.questions] }));
+  return rounds.map((r) => ({ ...r, questions: r.questions.map(cloneQuestion) }));
 }
 
 export function loadRounds() {
@@ -150,8 +193,11 @@ export function parseQuestionsImport(text) {
     if (typeof r.title !== 'string') throw new Error(`${where}: missing "title".`);
     if (typeof r.subtitle !== 'string') throw new Error(`${where}: missing "subtitle".`);
     if (typeof r.kicker !== 'string') throw new Error(`${where}: missing "kicker".`);
-    if (!Array.isArray(r.questions) || !r.questions.every((q) => typeof q === 'string')) {
-      throw new Error(`${where}: "questions" must be an array of strings.`);
+    if (!Array.isArray(r.questions) || !r.questions.every((q) =>
+      typeof q === 'string' ||
+      (q && typeof q === 'object' && typeof q.prompt === 'string')
+    )) {
+      throw new Error(`${where}: "questions" must be an array of strings or { prompt, ... } objects.`);
     }
   });
   if (!Array.isArray(data.tiebreakers) || !data.tiebreakers.every((t) => typeof t === 'string')) {
@@ -161,7 +207,7 @@ export function parseQuestionsImport(text) {
     throw new Error(`"tiebreakers" must contain exactly ${TIEBREAKER_COUNT} entries.`);
   }
   return {
-    rounds: data.rounds.map((r) => ({ ...r, questions: [...r.questions] })),
+    rounds: clone(data.rounds),
     tiebreakers: [...data.tiebreakers],
   };
 }
