@@ -1,8 +1,8 @@
 // Round / question content. Default values + localStorage persistence.
 // Edits made in the /control window save here; both windows read from here.
 
-const STORAGE_KEY = 'trivia-scaffold.rounds';
-const TIEBREAKER_STORAGE_KEY = 'trivia-scaffold.tiebreakers';
+const STORAGE_KEY = 'pub-trivia-scaffold.rounds';
+const TIEBREAKER_STORAGE_KEY = 'pub-trivia-scaffold.tiebreakers';
 
 export const TIEBREAKER_COUNT = 3;
 
@@ -40,36 +40,6 @@ export const DEFAULT_ROUNDS = [
     ),
   },
 ];
-
-// Barstool mode: 12 rounds × 2 questions = 24 questions. Two teams alternate
-// per question; on miss the other team gets one shot at the full point.
-// Round titles suggest variety (audio, scramble, visual) so hosts have a
-// menu of formats; each question can carry optional media (audioUrl,
-// imageUrl, videoUrl, displayHint) via the editor.
-const BARSTOOL_ROUND_TITLES = [
-  { title: "Warm-Up",            subtitle: "Easy points to set the tone." },
-  { title: "Categories",         subtitle: "A mix of topics — keep an open mind." },
-  { title: "Audio · 5 Seconds",  subtitle: "Identify the song from a five-second clip." },
-  { title: "Unscramble",         subtitle: "Jumbled letters — first to call it gets the point." },
-  { title: "Visual Cues",        subtitle: "What is it? Identify the image." },
-  { title: "Quotes",             subtitle: "Who said it — and from where?" },
-  { title: "Year Game",          subtitle: "Within five years gets the point." },
-  { title: "Standard Q&A",       subtitle: "Plain trivia. No tricks." },
-  { title: "Audio · 5 Seconds",  subtitle: "Another round of five-second clips." },
-  { title: "Pop Culture",        subtitle: "Movies, TV, music, internet." },
-  { title: "Final Five",         subtitle: "The hardest stretch. Buckle up." },
-  { title: "Lightning Round",    subtitle: "Snap answers. Move fast." },
-];
-
-export const DEFAULT_BARSTOOL_ROUNDS = BARSTOOL_ROUND_TITLES.map((meta, i) => ({
-  n: i + 1,
-  title: meta.title,
-  subtitle: meta.subtitle,
-  kicker: "2 Questions",
-  questions: Array.from({ length: 2 }, (_, qi) =>
-    `Placeholder question ${qi + 1} for Round ${i + 1} · ${meta.title}. Replace this with a real prompt.`
-  ),
-}));
 
 // Question shape is `string` (legacy) OR
 // `{ prompt, answer?, audioUrl?, imageUrl?, videoUrl?, displayHint? }`.
@@ -151,12 +121,10 @@ export function recapSplitsFor(round) {
   return [[0, a], [a, a + b], [a + b, total]];
 }
 
-// In pub mode, DEFAULT_ROUNDS numbers trivia rounds 2..5 because slot 1 is
-// reserved for the Picture Round. When the host hides the picture round,
-// shift the on-screen number down by 1 so players see rounds 1..4 with no
-// gap. Barstool rounds already number 1..N and stay as-is.
-export function displayRoundNumber(rN, mode, pictureRoundShown) {
-  if (mode === 'barstool') return rN;
+// DEFAULT_ROUNDS numbers trivia rounds 2..5 because slot 1 is reserved for
+// the Picture Round. When the host hides the picture round, shift the
+// on-screen number down by 1 so players see rounds 1..4 with no gap.
+export function displayRoundNumber(rN, pictureRoundShown) {
   return pictureRoundShown ? rN : rN - 1;
 }
 
@@ -166,7 +134,7 @@ export function displayRoundNumber(rN, mode, pictureRoundShown) {
 // between machines. Pictures intentionally not included — they're handled
 // by the Save Images to Disk flow on the Picture Round panel.
 
-export const QUESTIONS_EXPORT_TYPE = 'trivia-scaffold/questions';
+export const QUESTIONS_EXPORT_TYPE = 'pub-trivia-scaffold/questions';
 export const QUESTIONS_EXPORT_VERSION = 1;
 
 export function buildQuestionsExport(rounds, tiebreakers) {
@@ -190,7 +158,7 @@ export function parseQuestionsImport(text) {
     throw new Error('Expected a JSON object at the top level.');
   }
   if (data.type !== QUESTIONS_EXPORT_TYPE) {
-    throw new Error('Not a Trivia Scaffold questions export (wrong "type").');
+    throw new Error('Not a Pub Trivia Scaffold questions export (wrong "type").');
   }
   if (!Array.isArray(data.rounds) || data.rounds.length === 0) {
     throw new Error('"rounds" must be a non-empty array.');

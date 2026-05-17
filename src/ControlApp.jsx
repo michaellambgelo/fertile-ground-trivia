@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS, DEFAULT_BARSTOOL_ROUNDS,
+  loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS,
   loadTiebreakers, saveTiebreakers, resetTiebreakers, DEFAULT_TIEBREAKERS,
   buildQuestionsExport, parseImport, buildCsvTemplate, recapSplitsFor,
   normalizeQuestion, displayRoundNumber,
 } from './rounds.js';
 import { loadMeta, saveMeta, resetMeta, DEFAULT_META } from './meta.js';
-import { makeTeams } from './teams.js';
 import { loadPastes, savePastes, clearPastes, mergeItems, PICTURE_FILENAME } from './pictures.js';
 import {
   copyHandoutToClipboard, downloadHandoutPng, downloadAllImages, downloadAnswersHandoutPng,
@@ -62,9 +61,6 @@ export default function ControlApp() {
   const [tab, setTab] = useState('present');
   const [currentSlide, setCurrentSlide] = useState({ index: 0, total: 0, label: '' });
   const [timer, setTimer] = useState({ seconds: 0, paused: false, enabled: false });
-  // Session-only team state — same shape as App.jsx; synced via teams:update.
-  // Names default from meta.teams; scores reset to 0 on mount and on New Game.
-  const [teams, setTeams] = useState(() => makeTeams(loadMeta()));
 
   // Push edits to the display window.
   const commitRounds = useCallback((next) => {
@@ -91,53 +87,10 @@ export default function ControlApp() {
     broadcast('pictures:update', next);
   }, []);
 
-  // Team state — names + scores. Control window is the primary source of
-  // truth; the setup slide on the display can also push name edits via
-  // teams:update, which we receive here and mirror into local state.
-  const commitTeams = useCallback((next) => {
-    setTeams(next);
-    broadcast('teams:update', next);
-  }, []);
-
-  const adjustScore = useCallback((which, delta) => {
-    setTeams((curr) => {
-      const nextScore = Math.max(0, curr[which].score + delta);
-      const actualDelta = nextScore - curr[which].score;
-      const next = {
-        ...curr,
-        [which]: { ...curr[which], score: nextScore },
-      };
-      broadcast('teams:update', next);
-      // Celebrate point awards with a bell on the display window. Only fire
-      // when the score actually increased (skips corrections and the
-      // clamped-at-zero case for −1 buttons).
-      if (actualDelta > 0) {
-        broadcast('score:awarded', { team: which, delta: actualDelta });
-      }
-      return next;
-    });
-  }, []);
-
-  const resetScores = useCallback(() => {
-    setTeams((curr) => {
-      const next = { a: { ...curr.a, score: 0 }, b: { ...curr.b, score: 0 } };
-      broadcast('teams:update', next);
-      return next;
-    });
-  }, []);
-
-  const newGame = useCallback(() => {
-    const next = makeTeams(meta);
-    setTeams(next);
-    broadcast('teams:update', next);
-    broadcast('nav:goto', 0);
-  }, [meta]);
-
   // Listen for slide / timer state coming back from the display window.
   useBroadcast(useCallback((msg) => {
     if (msg.type === 'slidechange') setCurrentSlide(msg.payload);
     else if (msg.type === 'timer:state') setTimer(msg.payload);
-    else if (msg.type === 'teams:update') setTeams(msg.payload);
   }, []));
 
   // On mount, ask display for current state in case it was already running.
@@ -155,11 +108,6 @@ export default function ControlApp() {
           rounds={rounds}
           tiebreakers={tiebreakers}
           meta={meta}
-          teams={teams}
-          commitTeams={commitTeams}
-          adjustScore={adjustScore}
-          resetScores={resetScores}
-          newGame={newGame}
         />
       )}
       {tab === 'edit' && (
@@ -239,12 +187,8 @@ function Header({ tab, setTab, currentSlide }) {
 // ============================================================
 // PRESENTER PANEL — nav + timer + slide list
 // ============================================================
-function PresenterPanel({
-  currentSlide, timer, rounds, tiebreakers, meta,
-  teams, commitTeams, adjustScore, resetScores, newGame,
-}) {
+function PresenterPanel({ currentSlide, timer, rounds, tiebreakers, meta }) {
   const slideList = useMemo(() => buildSlideOutline(rounds, tiebreakers, meta), [rounds, tiebreakers, meta]);
-  const isBarstool = meta.mode === 'barstool';
   const narrow = useNarrowLayout();
 
   return (
@@ -254,145 +198,10 @@ function PresenterPanel({
       gap: 16, padding: 16,
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-        {isBarstool && (
-          <ScoringCard
-            teams={teams}
-            commitTeams={commitTeams}
-            adjustScore={adjustScore}
-            resetScores={resetScores}
-            newGame={newGame}
-            currentSlide={currentSlide}
-            rounds={rounds}
-            narrow={narrow}
-          />
-        )}
         <NavCard currentSlide={currentSlide} slideList={slideList} narrow={narrow} />
         <TimerCard timer={timer} />
       </div>
       <SlideList slideList={slideList} currentIndex={currentSlide.index} narrow={narrow} />
-    </div>
-  );
-}
-
-// ============================================================
-// SCORING CARD — barstool-mode only. Team names (editable), scores with
-// award/correction buttons, turn indicator chip derived from the current
-// slide label, host-only answer reveal, reset/new-game controls.
-// ============================================================
-function ScoringCard({ teams, commitTeams, adjustScore, resetScores, newGame, currentSlide, rounds, narrow }) {
-  const veryNarrow = narrow && typeof window !== 'undefined' && window.innerWidth < 520;
-  // Turn derivation: question label format is `R{n} Q{NN}`. Q01 → Team A,
-  // Q02 → Team B. Tiebreakers + non-question slides have no turn.
-  const label = currentSlide?.label || '';
-  const questionMatch = label.match(/^R(\d+) Q(\d+)/);
-  let turn = null;
-  if (questionMatch) {
-    const qNum = parseInt(questionMatch[2], 10);
-    turn = qNum === 1 ? 'a' : qNum === 2 ? 'b' : null;
-  }
-
-  // Answer reveal: find the current question's `answer` field by parsing the
-  // label and looking up in rounds. Shown only on the control window — never
-  // broadcast or displayed on the show deck.
-  let answerText = null;
-  if (questionMatch) {
-    const rN = parseInt(questionMatch[1], 10);
-    const qIdx = parseInt(questionMatch[2], 10) - 1;
-    const round = rounds.find((r) => r.n === rN);
-    const q = round?.questions?.[qIdx];
-    const data = q !== undefined ? normalizeQuestion(q) : null;
-    answerText = data?.answer || null;
-  }
-
-  const setName = (which, value) => {
-    commitTeams({ ...teams, [which]: { ...teams[which], name: value } });
-  };
-
-  return (
-    <Card title="Scoring">
-      {turn && (
-        <div style={{
-          marginBottom: 12, padding: '6px 12px',
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: COLORS.accentDim, color: COLORS.accent,
-          fontSize: 12, fontWeight: 600, letterSpacing: '0.18em',
-          textTransform: 'uppercase', borderRadius: 999,
-        }}>
-          ◆ Turn: {teams[turn].name}
-        </div>
-      )}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: veryNarrow ? '1fr' : '1fr 1fr',
-        gap: 12,
-      }}>
-        <TeamScorePanel
-          team={teams.a}
-          isTurn={turn === 'a'}
-          onName={(v) => setName('a', v)}
-          onAdd={() => adjustScore('a', 1)}
-          onSub={() => adjustScore('a', -1)}
-        />
-        <TeamScorePanel
-          team={teams.b}
-          isTurn={turn === 'b'}
-          onName={(v) => setName('b', v)}
-          onAdd={() => adjustScore('b', 1)}
-          onSub={() => adjustScore('b', -1)}
-        />
-      </div>
-      {answerText && (
-        <div style={{
-          marginTop: 12, padding: '10px 12px',
-          background: COLORS.panelAlt, border: `1px dashed ${COLORS.border}`,
-          borderRadius: 6,
-        }}>
-          <div style={{ fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase',
-            color: COLORS.textDim, marginBottom: 4 }}>
-            Answer (host only)
-          </div>
-          <div style={{ fontSize: 14, color: COLORS.text, fontWeight: 500 }}>{answerText}</div>
-        </div>
-      )}
-      <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Button onClick={resetScores} secondary>Reset Scores</Button>
-        <Button onClick={newGame} secondary>New Game</Button>
-      </div>
-    </Card>
-  );
-}
-
-function TeamScorePanel({ team, isTurn, onName, onAdd, onSub }) {
-  return (
-    <div style={{
-      padding: 12, borderRadius: 8,
-      border: `1px solid ${isTurn ? COLORS.accent : COLORS.border}`,
-      background: isTurn ? COLORS.accentDim : COLORS.panel,
-    }}>
-      <input
-        type="text"
-        value={team.name}
-        onChange={(e) => onName(e.target.value)}
-        maxLength={32}
-        style={{
-          width: '100%', padding: '6px 8px', marginBottom: 8,
-          background: COLORS.bg, color: COLORS.text,
-          border: `1px solid ${COLORS.border}`, borderRadius: 6,
-          fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
-          boxSizing: 'border-box',
-        }}
-      />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{
-          fontFamily: 'Oswald, sans-serif', fontSize: 36, fontWeight: 700,
-          color: COLORS.text, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
-          minWidth: 48,
-        }}>
-          {team.score}
-        </div>
-        <Button onClick={onAdd} primary>+1</Button>
-        <Button onClick={onSub} secondary>−1</Button>
-      </div>
     </div>
   );
 }
@@ -579,17 +388,6 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
     setDraftMeta((m) => ({ ...m, [section]: { ...m[section], [field]: value } }));
   };
 
-  const setMode = (nextMode) => {
-    setDirty(true);
-    setDraftMeta((m) => ({ ...m, mode: nextMode }));
-  };
-
-  const applyBarstoolDefaults = () => {
-    if (!confirm('Replace current rounds with the barstool defaults (12 rounds × 2 questions)? Unsaved edits to rounds will be lost.')) return;
-    setDraft(DEFAULT_BARSTOOL_ROUNDS.map((r) => ({ ...r, questions: [...r.questions] })));
-    setDirty(true);
-  };
-
   const save = () => {
     commitRounds(draft);
     commitTiebreakers(draftTiebreakers);
@@ -721,67 +519,6 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
         />
         {dirty && <span style={{ color: COLORS.warn, fontSize: 12 }}>Unsaved changes</span>}
       </div>
-
-      <Card title="Game Mode">
-        <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 10 }}>
-          Pub trivia = teams play on paper sheets, hosts grade per round. Barstool = two teams play head-to-head, alternating turns, miss → other team can steal for the full point.
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <ModeRadio
-            label="Pub trivia"
-            value="pub"
-            current={draftMeta.mode}
-            onChange={setMode}
-            hint="4 rounds × 10 questions"
-          />
-          <ModeRadio
-            label="Barstool"
-            value="barstool"
-            current={draftMeta.mode}
-            onChange={setMode}
-            hint="12 rounds × 2 questions"
-          />
-        </div>
-        {draftMeta.mode === 'barstool' && (
-          <>
-            <div style={{
-              marginTop: 14, padding: '10px 12px',
-              background: COLORS.panelAlt, border: `1px dashed ${COLORS.border}`,
-              borderRadius: 6, fontSize: 12, color: COLORS.textDim,
-            }}>
-              Current rounds: {draft.length} × {draft[0]?.questions.length ?? 0} questions.
-              {' '}
-              <button
-                onClick={applyBarstoolDefaults}
-                style={{
-                  border: 0, background: 'transparent', color: COLORS.accent,
-                  textDecoration: 'underline', cursor: 'pointer', padding: 0,
-                  fontFamily: 'inherit', fontSize: 12,
-                }}
-              >
-                Reset rounds to barstool defaults (12 × 2)
-              </button>
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <Field
-                label="Team 1"
-                value={draftMeta.teams?.a ?? 'Team 1'}
-                onChange={(v) => updateMeta('teams', 'a', v)}
-                compact
-              />
-              <Field
-                label="Team 2"
-                value={draftMeta.teams?.b ?? 'Team 2'}
-                onChange={(v) => updateMeta('teams', 'b', v)}
-                compact
-              />
-              <div style={{ fontSize: 11, color: COLORS.textDim, marginTop: 6 }}>
-                These names are the default for new games. Hosts can also rename teams on the setup slide; that change syncs back here automatically.
-              </div>
-            </div>
-          </>
-        )}
-      </Card>
 
       <Card title="Slides to Include">
         <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 8 }}>
@@ -1300,35 +1037,6 @@ function QuestionEditor({ index, question, onChange }) {
     </div>
   );
 }
-
-// ModeRadio — visual radio for Pub vs Barstool. Keeps state lifted (current +
-// onChange come from the editor's draft).
-function ModeRadio({ label, value, current, onChange, hint }) {
-  const selected = current === value;
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(value)}
-      style={{
-        flex: 1, padding: '10px 14px', borderRadius: 8, textAlign: 'left',
-        border: `1px solid ${selected ? COLORS.accent : COLORS.border}`,
-        background: selected ? COLORS.accentDim : COLORS.panel,
-        color: selected ? COLORS.accent : COLORS.text,
-        fontFamily: 'inherit', cursor: 'pointer',
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.04em' }}>
-        {label}
-      </div>
-      {hint && (
-        <div style={{ marginTop: 4, fontSize: 11, color: COLORS.textDim }}>
-          {hint}
-        </div>
-      )}
-    </button>
-  );
-}
-
 // ============================================================
 // PRIMITIVES
 // ============================================================
@@ -1424,24 +1132,20 @@ function Field({ label, value, onChange, multiline = false, compact = false }) {
 // Keep this in sync with App.jsx's slide composition.
 // ============================================================
 function buildSlideOutline(rounds, tiebreakers = [], meta = DEFAULT_META) {
-  const isBarstool = meta.mode === 'barstool';
   const titleEdition = meta.title?.edition || DEFAULT_META.title.edition;
   const endLines = `${meta.end?.hero1 || ''} ${meta.end?.hero2 || ''}`.trim();
-  const list = [];
-  if (isBarstool) {
-    list.push({ key: 'setup', label: 'Setup — Team Names + Start' });
-  }
-  list.push(
+  const pictureRoundShown = meta.show?.pictureRound ?? true;
+  const list = [
     { key: 'title', label: `Title — ${titleEdition}` },
-    { key: 'rules', label: isBarstool ? 'Rules — Head-to-Head + Steal' : 'House Rules' },
-  );
+    { key: 'rules', label: 'House Rules' },
+  ];
   if (meta.show?.prize ?? true) {
     list.push({ key: 'prize', label: 'Grand Prize — $100 Gift Card' });
   }
   if (meta.show?.costumeContest ?? true) {
     list.push({ key: 'costume', label: 'Costume Contest' });
   }
-  if (meta.show?.pictureRound ?? true) {
+  if (pictureRoundShown) {
     list.push(
       { key: 'r1-open', label: 'Round 1 Opener — Picture Round' },
       { key: 'r1-instr', label: 'Round 1 Instructions' },
@@ -1449,9 +1153,8 @@ function buildSlideOutline(rounds, tiebreakers = [], meta = DEFAULT_META) {
       { key: 'r1-recap', label: 'Picture Round Recap (5×2 grid)' },
     );
   }
-  const pictureRoundShown = meta.show?.pictureRound ?? true;
   rounds.forEach((r) => {
-    const displayN = displayRoundNumber(r.n, meta.mode, pictureRoundShown);
+    const displayN = displayRoundNumber(r.n, pictureRoundShown);
     list.push({ key: `r${r.n}-open`, label: `Round ${displayN} Opener — ${r.title}` });
     r.questions.forEach((q, qi) => {
       const data = normalizeQuestion(q);
@@ -1461,26 +1164,20 @@ function buildSlideOutline(rounds, tiebreakers = [], meta = DEFAULT_META) {
         detail: data.prompt,
       });
     });
-    // Pub mode wraps each round with intermission + recap. Barstool skips both.
-    if (!isBarstool) {
+    list.push({
+      key: `int-r${r.n}`,
+      label: `Intermission · Round ${displayN} (collect sheets)`,
+    });
+    recapSplitsFor(r).forEach(([start, end], i) => {
+      const part = String.fromCharCode(65 + i);
+      const range = `Q${String(start + 1).padStart(2, '0')}–${String(end).padStart(2, '0')}`;
       list.push({
-        key: `int-r${r.n}`,
-        label: `Intermission · Round ${displayN} (collect sheets)`,
+        key: `r${r.n}-recap-${String.fromCharCode(97 + i)}`,
+        label: `Round ${displayN} Recap ${part} — ${range}`,
       });
-      recapSplitsFor(r).forEach(([start, end], i) => {
-        const part = String.fromCharCode(65 + i);
-        const range = `Q${String(start + 1).padStart(2, '0')}–${String(end).padStart(2, '0')}`;
-        list.push({
-          key: `r${r.n}-recap-${String.fromCharCode(97 + i)}`,
-          label: `Round ${displayN} Recap ${part} — ${range}`,
-        });
-      });
-    }
+    });
   });
-  list.push({
-    key: 'end',
-    label: isBarstool ? 'End — Final Scoreboard' : `End — ${endLines || 'Thanks for Playing'}`,
-  });
+  list.push({ key: 'end', label: `End — ${endLines || 'Thanks for Playing'}` });
   if (meta.show?.tiebreakers ?? true) {
     list.push({ key: 'tb-intro', label: 'Tiebreakers — Final Wager (only if tied)' });
     tiebreakers.forEach((prompt, i) => {

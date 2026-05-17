@@ -1,14 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { broadcast, useBroadcast } from './broadcast.js';
 
-// Barstool mode context — `{ mode, teams }`. App.jsx wraps the deck in this
-// provider; slides consume it through BarstoolHud (the persistent scoreboard)
-// and through mode-aware variants (RulesSlide, QuestionSlide, EndSlide).
-// Pub mode is the default; consumers that don't see a Provider behave as pub.
-export const BarstoolContext = createContext({ mode: 'pub', teams: null });
-
 // ============================================================
-// DESIGN SYSTEM — Theme-neutral scaffold; clone via /new-trivia-deck and override PALETTE
+// DESIGN SYSTEM — Theme-neutral scaffold; clone via /new-pub-trivia-deck and override PALETTE
 // ============================================================
 const TYPE_SCALE = {
   display: 132,   // hero numerals
@@ -268,51 +262,6 @@ function AccentBar({ accentHex, length = 540, thickness = 14 }) {
 }
 
 // ============================================================
-// BARSTOOL HUD — persistent scoreboard banner shown on every slide when
-// `mode === 'barstool'`. Reads BarstoolContext; renders null in pub mode so
-// adding it to slideBase is a no-op for pub-trivia decks.
-// Positioned absolute at top of slideBase; sits inside each slide's natural
-// top padding (SPACING.paddingTop = 100 ≥ banner height 88) so no slide
-// layouts need to shift content down.
-// ============================================================
-function BarstoolHud() {
-  const { mode, teams } = useContext(BarstoolContext);
-  if (mode !== 'barstool' || !teams) return null;
-  const a = teams.a || { name: 'Team 1', score: 0 };
-  const b = teams.b || { name: 'Team 2', score: 0 };
-  const nameStyle = {
-    fontFamily: displayFont, fontWeight: 600, fontSize: 22,
-    letterSpacing: "0.22em", textTransform: "uppercase", color: PALETTE.paperDim,
-    maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-  };
-  const scoreStyle = {
-    fontFamily: displayFont, fontWeight: 700, fontSize: 52, lineHeight: 1,
-    color: PALETTE.paper, fontVariantNumeric: "tabular-nums",
-  };
-  return (
-    <div style={{
-      position: "absolute", top: 0, left: 0, right: 0, height: 100,
-      boxSizing: "border-box",
-      display: "flex", justifyContent: "center", alignItems: "center",
-      padding: "28px 48px 8px", gap: 20,
-      background: `linear-gradient(180deg, ${PALETTE.paper}14 0%, transparent 100%)`,
-      borderBottom: `1px solid ${PALETTE.paper}1A`,
-      pointerEvents: "none", zIndex: 5,
-      fontFamily: displayFont,
-    }}>
-      <div style={nameStyle}>{a.name}</div>
-      <div style={scoreStyle}>{a.score}</div>
-      <div style={{
-        fontFamily: displayFont, fontWeight: 600, fontSize: 32, lineHeight: 1,
-        color: PALETTE.paperDim, padding: "0 12px",
-      }}>—</div>
-      <div style={scoreStyle}>{b.score}</div>
-      <div style={nameStyle}>{b.name}</div>
-    </div>
-  );
-}
-
-// ============================================================
 // SLIDE: TITLE
 // ============================================================
 function TitleSlide({ tweaks, accent, title }) {
@@ -322,7 +271,6 @@ function TitleSlide({ tweaks, accent, title }) {
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           position: "absolute", inset: 0,
@@ -393,26 +341,17 @@ function TitleSlide({ tweaks, accent, title }) {
 // SLIDE: RULES
 // ============================================================
 function RulesSlide({ tweaks, accent }) {
-  const { mode } = useContext(BarstoolContext);
-  const pubRules = [
+  const rules = [
     { n: "I",   t: "No phones",                 d: "Looking up answers will result in points being deducted at the hosts' discretion." },
     { n: "II",  t: "Spelling is best attempt",  d: "Misspellings are fine as long as the answer is unambiguous and correct." },
     { n: "III", t: "Hosts are final",           d: "The hosts have the last word on every ruling. No appeals." },
     { n: "IV",  t: "Have fun",                  d: "Lean in, get into it, and don't take any single question too seriously." },
   ];
-  const barstoolRules = [
-    { n: "I",   t: "Two teams, alternating turns",  d: "Each question goes to one team. Q1 of every round to Team 1, Q2 to Team 2." },
-    { n: "II",  t: "Miss = steal chance",           d: "If one team answers incorrectly, the other team gets a chance to steal" },
-    { n: "III", t: "No phones",                     d: "We can see you." },
-    { n: "IV",  t: "Team Captains",                 d: "Answers are said aloud; hosts confirm final answer with a team captain." },
-  ];
-  const rules = mode === 'barstool' ? barstoolRules : pubRules;
   return (
     <section data-label="02 Rules">
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -478,7 +417,6 @@ function PrizeSlide({ tweaks, accent }) {
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -555,7 +493,6 @@ function CostumeContestSlide({ tweaks, accent }) {
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -621,7 +558,6 @@ function RoundOpener({ number, title, subtitle, kicker, tweaks, accent, label })
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -700,7 +636,6 @@ function PictureRoundInstructions({ tweaks, accent }) {
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px 130px`,
@@ -867,7 +802,6 @@ function QuestionSlide({
       <div style={slideBase} ref={ref}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -1030,7 +964,6 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex =
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -1109,7 +1042,6 @@ function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, la
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -1244,7 +1176,6 @@ function PictureRoundRecap({ items, tweaks, accent }) {
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -1305,7 +1236,6 @@ function TiebreakerIntroSlide({ tweaks, accent }) {
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -1363,152 +1293,15 @@ function TiebreakerIntroSlide({ tweaks, accent }) {
 }
 
 // ============================================================
-// SLIDE: BARSTOOL SETUP — team name entry, only used in barstool mode.
-// First slide in the deck. Inputs are controlled; onTeamsChange fires on
-// every keystroke (App.jsx updates local state + broadcasts teams:update).
-// Start button advances the deck. Scores are tracked in session state only —
-// refreshing the display loses them, which is documented inline as a warning
-// chip.
-// ============================================================
-function BarstoolSetupSlide({ tweaks, accent, teams, onTeamsChange }) {
-  const a = teams?.a || { name: 'Team 1', score: 0 };
-  const b = teams?.b || { name: 'Team 2', score: 0 };
-  const setName = (which, value) => {
-    onTeamsChange({
-      ...teams,
-      [which]: { ...teams[which], name: value },
-    });
-  };
-  const onStart = () => {
-    broadcast('nav:next', null);
-  };
-  const inputStyle = {
-    width: "100%",
-    padding: "20px 24px",
-    fontFamily: displayFont,
-    fontWeight: 600,
-    fontSize: 52,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    textAlign: "center",
-    color: PALETTE.paper,
-    background: `${PALETTE.paper}06`,
-    border: `2px solid ${accent.hex}`,
-    boxShadow: `inset 0 0 24px ${accent.glow}`,
-    outline: "none",
-    boxSizing: "border-box",
-  };
-  return (
-    <section data-label="Setup · Teams">
-      <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
-        {/* BarstoolHud intentionally omitted — scoreboard appears once names land. */}
-
-        <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
-          height: "100%", display: "flex", flexDirection: "column", justifyContent: "center",
-          alignItems: "center", textAlign: "center",
-        }}>
-          <Eyebrow accentHex={accent.hex}>Barstool Trivia · Setup</Eyebrow>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-            letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
-          }}>
-            WHO&apos;S PLAYING?
-          </div>
-          <div style={{
-            height: 4, width: 180, background: accent.hex, marginTop: 22, marginBottom: 56,
-            boxShadow: `0 0 16px ${accent.glow}`,
-          }} />
-
-          <div style={{
-            display: "grid", gridTemplateColumns: "1fr auto 1fr",
-            gap: 48, alignItems: "center", width: "100%", maxWidth: 1500,
-          }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{
-                fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
-                letterSpacing: "0.42em", color: accent.hex,
-              }}>TEAM 1</div>
-              <input
-                type="text"
-                value={a.name}
-                onChange={(e) => setName('a', e.target.value)}
-                maxLength={32}
-                style={inputStyle}
-              />
-            </div>
-            <div style={{
-              fontFamily: displayFont, fontWeight: 600, fontSize: 64,
-              letterSpacing: "0.42em", color: PALETTE.paperDim,
-            }}>VS</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{
-                fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
-                letterSpacing: "0.42em", color: accent.hex,
-              }}>TEAM 2</div>
-              <input
-                type="text"
-                value={b.name}
-                onChange={(e) => setName('b', e.target.value)}
-                maxLength={32}
-                style={inputStyle}
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onStart}
-            style={{
-              marginTop: 72,
-              padding: "24px 80px",
-              fontFamily: displayFont,
-              fontWeight: 700,
-              fontSize: 56,
-              letterSpacing: "0.32em",
-              color: PALETTE.ink,
-              background: accent.hex,
-              border: 0,
-              cursor: "pointer",
-              boxShadow: `0 0 32px ${accent.glow}, 0 0 64px ${accent.glow}`,
-            }}
-          >
-            START GAME
-          </button>
-
-          <div style={{
-            marginTop: 36, padding: "12px 24px",
-            border: `1px solid ${PALETTE.paperDim}66`,
-            fontFamily: displayFont, fontSize: TYPE_SCALE.small,
-            letterSpacing: "0.32em", color: PALETTE.paperDim, textTransform: "uppercase",
-          }}>
-            ⚠ Refresh during game = scores reset
-          </div>
-        </div>
-
-        <FooterBar left="Setup" right="Enter team names · Press Start" accentHex={accent.hex} />
-      </div>
-    </section>
-  );
-}
-
-// ============================================================
 // SLIDE: END
 // ============================================================
 function EndSlide({ tweaks, accent, end }) {
-  const { mode, teams } = useContext(BarstoolContext);
-  if (mode === 'barstool' && teams) {
-    return <BarstoolEndSlide tweaks={tweaks} accent={accent} teams={teams} />;
-  }
   const e = end || {};
   return (
     <section data-label="End">
       <div style={slideBase}>
         <SlideAtmosphere tweaks={tweaks} accent={accent} />
         <CornerMarks accentHex={accent.hex} />
-        <BarstoolHud />
 
         <div style={{
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
@@ -1551,93 +1344,9 @@ function EndSlide({ tweaks, accent, end }) {
   );
 }
 
-// Barstool end slide — final scoreboard. Winner badge above the team with the
-// higher score; "TIE" message when scores match (host advances to tiebreakers
-// if `meta.show.tiebreakers` is on).
-function BarstoolEndSlide({ tweaks, accent, teams }) {
-  const a = teams.a;
-  const b = teams.b;
-  const tied = a.score === b.score;
-  const aWins = a.score > b.score;
-  return (
-    <section data-label="End">
-      <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
-        {/* BarstoolHud intentionally omitted — the whole slide is the scoreboard. */}
-
-        <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
-          height: "100%", display: "flex", flexDirection: "column", justifyContent: "center",
-          alignItems: "center", textAlign: "center",
-        }}>
-          <Eyebrow accentHex={accent.hex}>Final Score</Eyebrow>
-
-          <div style={{
-            marginTop: 56, display: "grid", gridTemplateColumns: "1fr auto 1fr",
-            alignItems: "center", gap: 64, width: "100%", maxWidth: 1500,
-          }}>
-            <FinalScoreColumn team={a} accent={accent} winner={aWins} tied={tied} />
-            <div style={{
-              fontFamily: displayFont, fontWeight: 600, fontSize: 80, lineHeight: 1,
-              letterSpacing: "0.42em", color: PALETTE.paperDim,
-            }}>
-              VS
-            </div>
-            <FinalScoreColumn team={b} accent={accent} winner={!aWins && !tied} tied={tied} />
-          </div>
-
-          <div style={{
-            marginTop: 64, fontFamily: displayFont, fontWeight: 600,
-            fontSize: TYPE_SCALE.subtitle, color: PALETTE.paperDim, letterSpacing: "0.36em",
-          }}>
-            {tied ? "TIE — PROCEED TO TIEBREAKER" : "WINNER TAKES IT"}
-          </div>
-        </div>
-
-        <FooterBar left="End of Game" right={tied ? "Tiebreaker Next" : "Winner Declared"} accentHex={accent.hex} />
-      </div>
-    </section>
-  );
-}
-
-function FinalScoreColumn({ team, accent, winner, tied }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-      {winner && (
-        <div style={{
-          padding: "10px 24px", border: `2px solid ${accent.hex}`,
-          fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.meta,
-          letterSpacing: "0.42em", color: accent.hex,
-          boxShadow: `0 0 24px ${accent.glow}`,
-        }}>
-          ★ WINNER
-        </div>
-      )}
-      <div style={{
-        fontFamily: displayFont, fontWeight: 700, fontSize: 64,
-        letterSpacing: "0.08em", color: PALETTE.paper, textTransform: "uppercase",
-        maxWidth: 640, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        opacity: winner || tied ? 1 : 0.5,
-      }}>
-        {team.name}
-      </div>
-      <div style={{
-        fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
-        color: winner || tied ? PALETTE.paper : PALETTE.paperDim,
-        textShadow: winner ? `0 0 50px ${accent.glow}` : "none",
-        fontVariantNumeric: "tabular-nums",
-      }}>
-        {team.score}
-      </div>
-    </div>
-  );
-}
-
 export {
   TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide, RoundOpener,
   PictureRoundInstructions, QuestionSlide, RoundRecap, PictureRoundRecap,
   IntermissionSlide, TiebreakerIntroSlide, EndSlide,
-  BarstoolSetupSlide,
   ACCENTS, DEFAULTS, PALETTE,
 };

@@ -7,13 +7,10 @@ import {
   ACCENTS, TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide,
   RoundOpener, PictureRoundInstructions, IntermissionSlide, QuestionSlide,
   RoundRecap, PictureRoundRecap, TiebreakerIntroSlide, EndSlide,
-  BarstoolSetupSlide, BarstoolContext,
 } from './slides.jsx';
 import { loadRounds, loadTiebreakers, recapSplitsFor, normalizeQuestion, displayRoundNumber } from './rounds.js';
 import { loadPastes, mergeItems } from './pictures.js';
 import { loadMeta } from './meta.js';
-import { makeTeams } from './teams.js';
-import { playBell, unlockAudio } from './bell.js';
 import { broadcast, useBroadcast } from './broadcast.js';
 
 // ============================================================
@@ -56,19 +53,9 @@ function App() {
   const [pastes, setPastes] = useState(() => loadPastes());
   const [tiebreakers, setTiebreakers] = useState(() => loadTiebreakers());
   const [meta, setMeta] = useState(() => loadMeta());
-  // Session-only team state. Lost on refresh by design — names + scores live
-  // only as long as the current game.
-  const [teams, setTeams] = useState(() => makeTeams(meta));
   const pictureItems = mergeItems(pastes);
   const accent = ACCENTS[tweaks.accent] || ACCENTS["accent-red"];
   const stageRef = useRef(null);
-
-  // Broadcast team-state changes (typed-in name on setup slide, or any other
-  // local change). Control window subscribes to keep its scoring UI in sync.
-  const onTeamsChange = useCallback((next) => {
-    setTeams(next);
-    broadcast('teams:update', next);
-  }, []);
 
   // Receive content + nav commands from the /control window.
   useBroadcast(useCallback((msg) => {
@@ -77,36 +64,15 @@ function App() {
     else if (msg.type === 'pictures:update') setPastes(msg.payload);
     else if (msg.type === 'tiebreakers:update') setTiebreakers(msg.payload);
     else if (msg.type === 'meta:update') setMeta(msg.payload);
-    else if (msg.type === 'teams:update') setTeams(msg.payload);
-    else if (msg.type === 'game:reset') setTeams(makeTeams(meta));
-    else if (msg.type === 'score:awarded') playBell();
     else if (msg.type === 'nav:next') stage?.next();
     else if (msg.type === 'nav:prev') stage?.prev();
     else if (msg.type === 'nav:goto') stage?.goTo(msg.payload);
     else if (msg.type === 'sync:request' && stage) {
       const slide = stage.querySelector('section[data-deck-active]');
       broadcast('slidechange', describeSlide(stage, slide));
-      broadcast('teams:update', teams);
       // QuestionSlide responds with its own timer:state if it's the active slide.
     }
-  }, [meta, teams]));
-
-  // Unlock the audio context on the first user gesture so later
-  // `score:awarded` broadcasts (which arrive without a user gesture on this
-  // window) can play the bell. Browsers gate audio on user interaction.
-  useEffect(() => {
-    const handler = () => {
-      unlockAudio();
-      window.removeEventListener('pointerdown', handler);
-      window.removeEventListener('keydown', handler);
-    };
-    window.addEventListener('pointerdown', handler);
-    window.addEventListener('keydown', handler);
-    return () => {
-      window.removeEventListener('pointerdown', handler);
-      window.removeEventListener('keydown', handler);
-    };
-  }, []);
+  }, []));
 
   // Forward slide changes to the /control window.
   useEffect(() => {
@@ -127,20 +93,6 @@ function App() {
   }, []);
 
   const slides = [];
-  const isBarstool = meta.mode === 'barstool';
-
-  // 0. Barstool setup slide — only in barstool mode, always first.
-  if (isBarstool) {
-    slides.push(
-      <BarstoolSetupSlide
-        key="setup"
-        tweaks={tweaks}
-        accent={accent}
-        teams={teams}
-        onTeamsChange={onTeamsChange}
-      />
-    );
-  }
 
   // 1. Title
   slides.push(<TitleSlide key="title" tweaks={tweaks} accent={accent} title={meta.title} />);
@@ -192,7 +144,7 @@ function App() {
   // (empty map = degrade to the global accent).
   rounds.forEach((r, idx) => {
     const roundAccent = accentFor(r.n, accent);
-    const displayN = displayRoundNumber(r.n, meta.mode, meta.show.pictureRound);
+    const displayN = displayRoundNumber(r.n, meta.show.pictureRound);
     slides.push(
       <RoundOpener
         key={`r${r.n}-open`}
@@ -226,47 +178,41 @@ function App() {
       );
     });
 
-    // Pub mode wraps each round with intermission + recap slides. In barstool
-    // mode with 12 rounds × 2 questions, 12 intermissions/recaps would
-    // overwhelm the deck — they're skipped entirely. Tied games still resolve
-    // through the toggleable tiebreaker cluster after the End slide.
-    if (!isBarstool) {
-      // Intermission BEFORE recap so teams hand in sheets before answers are
-      // revealed. R2-R4 tease the next round; R5 has no next round, so it teases
-      // the final tally instead. Intermission previews the NEXT round's accent.
-      const next = rounds[idx + 1];
-      const intermissionAccent = next ? accentFor(next.n, accent) : roundAccent;
-      const nextDisplayN = next ? displayRoundNumber(next.n, meta.mode, meta.show.pictureRound) : undefined;
+    // Intermission BEFORE recap so teams hand in sheets before answers are
+    // revealed. R2-R4 tease the next round; R5 has no next round, so it teases
+    // the final tally instead. Intermission previews the NEXT round's accent.
+    const next = rounds[idx + 1];
+    const intermissionAccent = next ? accentFor(next.n, accent) : roundAccent;
+    const nextDisplayN = next ? displayRoundNumber(next.n, meta.show.pictureRound) : undefined;
+    slides.push(
+      <IntermissionSlide
+        key={`int-r${r.n}`}
+        label={`Intermission · Round 0${displayN}`}
+        nextRound={nextDisplayN}
+        nextTitle={next?.title}
+        nextLabel={next ? undefined : "Final Tally · Winners Revealed"}
+        tweaks={tweaks}
+        accent={intermissionAccent}
+      />
+    );
+
+    // Recap slides per round. Most rounds split 5+5; round 5's prompts run
+    // long enough that 5-per-slide gets cramped, so it splits 3+3+4.
+    const recapSplits = recapSplitsFor(r);
+    recapSplits.forEach(([start, end], i) => {
       slides.push(
-        <IntermissionSlide
-          key={`int-r${r.n}`}
-          label={`Intermission · Round 0${displayN}`}
-          nextRound={nextDisplayN}
-          nextTitle={next?.title}
-          nextLabel={next ? undefined : "Final Tally · Winners Revealed"}
+        <RoundRecap
+          key={`r${r.n}-recap-${String.fromCharCode(97 + i)}`}
+          round={displayN}
+          roundTitle={r.title}
+          questions={r.questions.slice(start, end).map((q) => normalizeQuestion(q).prompt)}
+          startIndex={start}
+          part={String.fromCharCode(65 + i)}
           tweaks={tweaks}
-          accent={intermissionAccent}
+          accent={roundAccent}
         />
       );
-
-      // Recap slides per round. Most rounds split 5+5; round 5's prompts run
-      // long enough that 5-per-slide gets cramped, so it splits 3+3+4.
-      const recapSplits = recapSplitsFor(r);
-      recapSplits.forEach(([start, end], i) => {
-        slides.push(
-          <RoundRecap
-            key={`r${r.n}-recap-${String.fromCharCode(97 + i)}`}
-            round={displayN}
-            roundTitle={r.title}
-            questions={r.questions.slice(start, end).map((q) => normalizeQuestion(q).prompt)}
-            startIndex={start}
-            part={String.fromCharCode(65 + i)}
-            tweaks={tweaks}
-            accent={roundAccent}
-          />
-        );
-      });
-    }
+    });
   });
 
   // End — normal sequential close. Tiebreakers live past this slide, only
@@ -301,7 +247,7 @@ function App() {
   }
 
   return (
-    <BarstoolContext.Provider value={{ mode: meta.mode, teams }}>
+    <>
       <deck-stage ref={stageRef} width="1920" height="1080">
         {slides}
       </deck-stage>
@@ -347,7 +293,7 @@ function App() {
           )}
         </TweakSection>
       </TweaksPanel>
-    </BarstoolContext.Provider>
+    </>
   );
 }
 
