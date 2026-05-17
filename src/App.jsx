@@ -9,7 +9,7 @@ import {
   RoundRecap, PictureRoundRecap, TiebreakerIntroSlide, EndSlide,
   BarstoolSetupSlide, BarstoolContext,
 } from './slides.jsx';
-import { loadRounds, loadTiebreakers, recapSplitsFor, normalizeQuestion } from './rounds.js';
+import { loadRounds, loadTiebreakers, recapSplitsFor, normalizeQuestion, displayRoundNumber } from './rounds.js';
 import { loadPastes, mergeItems } from './pictures.js';
 import { loadMeta } from './meta.js';
 import { makeTeams } from './teams.js';
@@ -192,11 +192,12 @@ function App() {
   // (empty map = degrade to the global accent).
   rounds.forEach((r, idx) => {
     const roundAccent = accentFor(r.n, accent);
+    const displayN = displayRoundNumber(r.n, meta.mode, meta.show.pictureRound);
     slides.push(
       <RoundOpener
         key={`r${r.n}-open`}
-        label={`Round 0${r.n} Opener`}
-        number={r.n}
+        label={`Round 0${displayN} Opener`}
+        number={displayN}
         title={r.title}
         subtitle={r.subtitle}
         kicker={r.kicker}
@@ -209,7 +210,7 @@ function App() {
       slides.push(
         <QuestionSlide
           key={`r${r.n}-q${qi + 1}`}
-          round={r.n}
+          round={displayN}
           q={qi + 1}
           total={r.questions.length}
           prompt={data.prompt}
@@ -235,11 +236,12 @@ function App() {
       // the final tally instead. Intermission previews the NEXT round's accent.
       const next = rounds[idx + 1];
       const intermissionAccent = next ? accentFor(next.n, accent) : roundAccent;
+      const nextDisplayN = next ? displayRoundNumber(next.n, meta.mode, meta.show.pictureRound) : undefined;
       slides.push(
         <IntermissionSlide
           key={`int-r${r.n}`}
-          label={`Intermission · Round 0${r.n}`}
-          nextRound={next?.n}
+          label={`Intermission · Round 0${displayN}`}
+          nextRound={nextDisplayN}
           nextTitle={next?.title}
           nextLabel={next ? undefined : "Final Tally · Winners Revealed"}
           tweaks={tweaks}
@@ -254,7 +256,7 @@ function App() {
         slides.push(
           <RoundRecap
             key={`r${r.n}-recap-${String.fromCharCode(97 + i)}`}
-            round={r.n}
+            round={displayN}
             roundTitle={r.title}
             questions={r.questions.slice(start, end).map((q) => normalizeQuestion(q).prompt)}
             startIndex={start}

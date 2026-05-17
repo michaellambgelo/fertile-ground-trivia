@@ -3,7 +3,7 @@ import {
   loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS, DEFAULT_BARSTOOL_ROUNDS,
   loadTiebreakers, saveTiebreakers, resetTiebreakers, DEFAULT_TIEBREAKERS,
   buildQuestionsExport, parseImport, buildCsvTemplate, recapSplitsFor,
-  normalizeQuestion,
+  normalizeQuestion, displayRoundNumber,
 } from './rounds.js';
 import { loadMeta, saveMeta, resetMeta, DEFAULT_META } from './meta.js';
 import { makeTeams } from './teams.js';
@@ -1449,13 +1449,15 @@ function buildSlideOutline(rounds, tiebreakers = [], meta = DEFAULT_META) {
       { key: 'r1-recap', label: 'Picture Round Recap (5×2 grid)' },
     );
   }
+  const pictureRoundShown = meta.show?.pictureRound ?? true;
   rounds.forEach((r) => {
-    list.push({ key: `r${r.n}-open`, label: `Round ${r.n} Opener — ${r.title}` });
+    const displayN = displayRoundNumber(r.n, meta.mode, pictureRoundShown);
+    list.push({ key: `r${r.n}-open`, label: `Round ${displayN} Opener — ${r.title}` });
     r.questions.forEach((q, qi) => {
       const data = normalizeQuestion(q);
       list.push({
         key: `r${r.n}-q${qi + 1}`,
-        label: `Round ${r.n} · Question ${qi + 1} / ${r.questions.length}`,
+        label: `Round ${displayN} · Question ${qi + 1} / ${r.questions.length}`,
         detail: data.prompt,
       });
     });
@@ -1463,14 +1465,14 @@ function buildSlideOutline(rounds, tiebreakers = [], meta = DEFAULT_META) {
     if (!isBarstool) {
       list.push({
         key: `int-r${r.n}`,
-        label: `Intermission · Round ${r.n} (collect sheets)`,
+        label: `Intermission · Round ${displayN} (collect sheets)`,
       });
       recapSplitsFor(r).forEach(([start, end], i) => {
         const part = String.fromCharCode(65 + i);
         const range = `Q${String(start + 1).padStart(2, '0')}–${String(end).padStart(2, '0')}`;
         list.push({
           key: `r${r.n}-recap-${String.fromCharCode(97 + i)}`,
-          label: `Round ${r.n} Recap ${part} — ${range}`,
+          label: `Round ${displayN} Recap ${part} — ${range}`,
         });
       });
     }

@@ -280,49 +280,34 @@ function BarstoolHud() {
   if (mode !== 'barstool' || !teams) return null;
   const a = teams.a || { name: 'Team 1', score: 0 };
   const b = teams.b || { name: 'Team 2', score: 0 };
-  // Total height 100 = the slide's own top padding (SPACING.paddingTop). The
-  // inner content is centered with an extra top inset so the labels + scores
-  // sit lower in the band, well clear of the top edge.
+  const nameStyle = {
+    fontFamily: displayFont, fontWeight: 600, fontSize: 22,
+    letterSpacing: "0.22em", textTransform: "uppercase", color: PALETTE.paperDim,
+    maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  };
+  const scoreStyle = {
+    fontFamily: displayFont, fontWeight: 700, fontSize: 52, lineHeight: 1,
+    color: PALETTE.paper, fontVariantNumeric: "tabular-nums",
+  };
   return (
     <div style={{
       position: "absolute", top: 0, left: 0, right: 0, height: 100,
       boxSizing: "border-box",
-      display: "grid", gridTemplateColumns: "1fr auto 1fr",
-      alignItems: "center", padding: "28px 48px 8px", gap: 32,
+      display: "flex", justifyContent: "center", alignItems: "center",
+      padding: "28px 48px 8px", gap: 20,
       background: `linear-gradient(180deg, ${PALETTE.paper}14 0%, transparent 100%)`,
       borderBottom: `1px solid ${PALETTE.paper}1A`,
       pointerEvents: "none", zIndex: 5,
       fontFamily: displayFont,
     }}>
-      <TeamHudCell name={a.name} score={a.score} align="left" />
+      <div style={nameStyle}>{a.name}</div>
+      <div style={scoreStyle}>{a.score}</div>
       <div style={{
-        fontFamily: displayFont, fontWeight: 600, fontSize: 24,
-        letterSpacing: "0.42em", color: PALETTE.paperDim, textTransform: "uppercase",
-      }}>VS</div>
-      <TeamHudCell name={b.name} score={b.score} align="right" />
-    </div>
-  );
-}
-
-function TeamHudCell({ name, score, align }) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 20,
-      justifyContent: align === "right" ? "flex-end" : "flex-start",
-    }}>
-      <div style={{
-        fontFamily: displayFont, fontWeight: 600, fontSize: 28,
-        letterSpacing: "0.18em", textTransform: "uppercase", color: PALETTE.paper,
-        maxWidth: 520, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-      }}>
-        {name}
-      </div>
-      <div style={{
-        fontFamily: displayFont, fontWeight: 700, fontSize: 52, lineHeight: 1,
-        color: PALETTE.paper, fontVariantNumeric: "tabular-nums",
-      }}>
-        {score}
-      </div>
+        fontFamily: displayFont, fontWeight: 600, fontSize: 32, lineHeight: 1,
+        color: PALETTE.paperDim, padding: "0 12px",
+      }}>—</div>
+      <div style={scoreStyle}>{b.score}</div>
+      <div style={nameStyle}>{b.name}</div>
     </div>
   );
 }

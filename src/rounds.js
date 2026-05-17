@@ -151,6 +151,15 @@ export function recapSplitsFor(round) {
   return [[0, a], [a, a + b], [a + b, total]];
 }
 
+// In pub mode, DEFAULT_ROUNDS numbers trivia rounds 2..5 because slot 1 is
+// reserved for the Picture Round. When the host hides the picture round,
+// shift the on-screen number down by 1 so players see rounds 1..4 with no
+// gap. Barstool rounds already number 1..N and stay as-is.
+export function displayRoundNumber(rN, mode, pictureRoundShown) {
+  if (mode === 'barstool') return rN;
+  return pictureRoundShown ? rN : rN - 1;
+}
+
 // ---- Export / import ------------------------------------------------------
 // Round content + tiebreakers serialize to a single JSON file so a host can
 // back up before clicking Reset, restore after a wipe, or move questions
