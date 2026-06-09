@@ -1,28 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  useTweaks, TweaksPanel, TweakSection,
-  TweakSlider, TweakToggle, TweakRadio,
-} from './tweaks-panel.jsx';
-import {
   ACCENTS, TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide,
   RoundOpener, PictureRoundInstructions, IntermissionSlide, QuestionSlide,
   RoundRecap, PictureRoundRecap, TiebreakerIntroSlide, EndSlide,
 } from './slides.jsx';
 import { loadRounds, loadTiebreakers, recapSplitsFor, normalizeQuestion, displayRoundNumber } from './rounds.js';
 import { loadPastes, mergeItems } from './pictures.js';
-import { loadMeta } from './meta.js';
+import { loadMeta, DEFAULT_META } from './meta.js';
 import { broadcast, useBroadcast } from './broadcast.js';
-
-// ============================================================
-// EDITMODE TWEAK DEFAULTS
-// ============================================================
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "accent": "accent-red",
-  "showStars": false,
-  "showQNumbers": true,
-  "showTimer": true,
-  "timerSeconds": 60
-}/*EDITMODE-END*/;
 
 // ============================================================
 // PER-ROUND ACCENT ROTATION
@@ -48,12 +33,13 @@ function accentFor(n, global) {
 // APP
 // ============================================================
 function App() {
-  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [rounds, setRounds] = useState(() => loadRounds());
   const [pastes, setPastes] = useState(() => loadPastes());
   const [tiebreakers, setTiebreakers] = useState(() => loadTiebreakers());
   const [meta, setMeta] = useState(() => loadMeta());
   const pictureItems = mergeItems(pastes);
+  // Display tweaks now live in meta (meta.display); slides still take a `tweaks` prop.
+  const tweaks = meta.display || DEFAULT_META.display;
   const accent = ACCENTS[tweaks.accent] || ACCENTS["accent-red"];
   const stageRef = useRef(null);
 
@@ -251,48 +237,6 @@ function App() {
       <deck-stage ref={stageRef} width="1920" height="1080">
         {slides}
       </deck-stage>
-
-      <TweaksPanel title="Tweaks">
-        <TweakSection title="Atmosphere">
-          <TweakToggle
-            label="Ambient backdrop"
-            value={tweaks.showStars}
-            onChange={(v) => setTweak("showStars", v)}
-          />
-          <TweakRadio
-            label="Accent"
-            value={tweaks.accent}
-            onChange={(v) => setTweak("accent", v)}
-            options={[
-              { value: "accent-blue",  label: "Blue" },
-              { value: "accent-green", label: "Green" },
-              { value: "accent-red",   label: "Red" },
-              { value: "accent-gold",  label: "Gold" },
-            ]}
-          />
-        </TweakSection>
-
-        <TweakSection title="Question slides">
-          <TweakToggle
-            label="Show question numbers"
-            value={tweaks.showQNumbers}
-            onChange={(v) => setTweak("showQNumbers", v)}
-          />
-          <TweakToggle
-            label="Show timer"
-            value={tweaks.showTimer}
-            onChange={(v) => setTweak("showTimer", v)}
-          />
-          {tweaks.showTimer && (
-            <TweakSlider
-              label="Timer seconds"
-              min={15} max={90} step={5}
-              value={tweaks.timerSeconds}
-              onChange={(v) => setTweak("timerSeconds", v)}
-            />
-          )}
-        </TweakSection>
-      </TweaksPanel>
     </>
   );
 }

@@ -24,6 +24,18 @@ export const DEFAULT_META = {
     pictureRound: true,
     tiebreakers: true,
   },
+  pictureRound: {
+    handoutInstruction: "Identify the character, place, ship or creature.",
+  },
+  // Display tweaks — global accent + atmosphere + question-slide options.
+  // App.jsx derives `tweaks = meta.display`; slides consume it unchanged.
+  display: {
+    accent: "accent-red",
+    showStars: false,
+    showQNumbers: true,
+    showTimer: true,
+    timerSeconds: 60,
+  },
 };
 
 function clone(meta) {
@@ -31,6 +43,8 @@ function clone(meta) {
     title: { ...meta.title },
     end: { ...meta.end },
     show: { ...meta.show },
+    pictureRound: { ...meta.pictureRound },
+    display: { ...meta.display },
   };
 }
 
@@ -41,6 +55,8 @@ function withDefaults(parsed) {
     title: { ...DEFAULT_META.title, ...(parsed?.title || {}) },
     end: { ...DEFAULT_META.end, ...(parsed?.end || {}) },
     show: { ...DEFAULT_META.show, ...(parsed?.show || {}) },
+    pictureRound: { ...DEFAULT_META.pictureRound, ...(parsed?.pictureRound || {}) },
+    display: { ...DEFAULT_META.display, ...(parsed?.display || {}) },
   };
 }
 

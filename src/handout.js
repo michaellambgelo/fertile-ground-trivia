@@ -7,6 +7,11 @@
 
 import { PICTURE_FILENAME } from './pictures.js';
 
+// Fallback instruction line printed under the handout title. Callers (the
+// control window) pass the per-game value from meta.pictureRound; this keeps
+// the bare renderHandoutCanvas(items) call working on its own.
+const DEFAULT_HANDOUT_INSTRUCTION = 'Identify the character, place, ship or creature.';
+
 // Page geometry — mirrors the on-screen PictureRoundRecap slide so the same
 // image crops the same way in both surfaces. Margins, gaps, and per-cell
 // dimensions match the deck's SPACING + TYPE_SCALE constants and the slide
@@ -49,7 +54,7 @@ function loadImage(src) {
   });
 }
 
-export async function renderHandoutCanvas(items) {
+export async function renderHandoutCanvas(items, instruction = DEFAULT_HANDOUT_INSTRUCTION) {
   await ensureFonts();
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -78,7 +83,7 @@ export async function renderHandoutCanvas(items) {
   ctx.font = `italic 500 36px 'Inter', system-ui, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText('Identify the character, place, ship or creature.', MARGIN_X, INSTRUCTION_Y);
+  ctx.fillText(instruction, MARGIN_X, INSTRUCTION_Y);
 
   // TEAM field — right side of the instruction row.
   drawTeamField(ctx, W - MARGIN_X - 480, INSTRUCTION_Y, 480);
@@ -165,8 +170,8 @@ function canvasToBlob(canvas, type = 'image/png') {
   return new Promise((resolve) => canvas.toBlob(resolve, type));
 }
 
-export async function copyHandoutToClipboard(items) {
-  const canvas = await renderHandoutCanvas(items);
+export async function copyHandoutToClipboard(items, instruction = DEFAULT_HANDOUT_INSTRUCTION) {
+  const canvas = await renderHandoutCanvas(items, instruction);
   const blob = await canvasToBlob(canvas);
   if (!blob) throw new Error('Failed to create handout blob');
   if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
@@ -175,8 +180,8 @@ export async function copyHandoutToClipboard(items) {
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
 }
 
-export async function downloadHandoutPng(items, filename = 'picture-round-handout.png') {
-  const canvas = await renderHandoutCanvas(items);
+export async function downloadHandoutPng(items, instruction = DEFAULT_HANDOUT_INSTRUCTION, filename = 'picture-round-handout.png') {
+  const canvas = await renderHandoutCanvas(items, instruction);
   const blob = await canvasToBlob(canvas);
   if (!blob) throw new Error('Failed to create handout blob');
   triggerDownload(blob, filename);

@@ -124,6 +124,7 @@ export default function ControlApp() {
         <PicturesPanel
           pastes={pastes}
           commitPastes={commitPastes}
+          meta={meta}
         />
       )}
     </div>
@@ -546,6 +547,58 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
         />
       </Card>
 
+      <Card title="Display">
+        <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 8 }}>
+          Presentation tweaks applied across the deck. Like everything else here, they push to the display on Save.
+        </div>
+        <Segmented
+          label="Accent (global)"
+          value={draftMeta.display.accent}
+          onChange={(v) => updateMeta('display', 'accent', v)}
+          options={[
+            { value: 'accent-blue',  label: 'Blue' },
+            { value: 'accent-green', label: 'Green' },
+            { value: 'accent-red',   label: 'Red' },
+            { value: 'accent-gold',  label: 'Gold' },
+          ]}
+        />
+        <Toggle
+          label="Ambient backdrop"
+          value={draftMeta.display.showStars}
+          onChange={(v) => updateMeta('display', 'showStars', v)}
+        />
+        <Toggle
+          label="Show question numbers"
+          value={draftMeta.display.showQNumbers}
+          onChange={(v) => updateMeta('display', 'showQNumbers', v)}
+        />
+        <Toggle
+          label="Show timer"
+          value={draftMeta.display.showTimer}
+          onChange={(v) => updateMeta('display', 'showTimer', v)}
+        />
+        {draftMeta.display.showTimer && (
+          <Slider
+            label="Timer seconds"
+            value={draftMeta.display.timerSeconds}
+            min={15}
+            max={90}
+            step={5}
+            unit="s"
+            onChange={(v) => updateMeta('display', 'timerSeconds', v)}
+          />
+        )}
+      </Card>
+
+      <Card title="Picture Round">
+        <Field
+          label="Handout instruction"
+          value={draftMeta.pictureRound.handoutInstruction}
+          onChange={(v) => updateMeta('pictureRound', 'handoutInstruction', v)}
+          multiline
+        />
+      </Card>
+
       <Card title="Title Slide">
         <Field label="Eyebrow" value={draftMeta.title.eyebrow} onChange={(v) => updateMeta('title', 'eyebrow', v)} />
         <Field label="Hero" value={draftMeta.title.hero} onChange={(v) => updateMeta('title', 'hero', v)} />
@@ -688,7 +741,7 @@ function CsvImportModal({ csvImport, rounds, onApply, onCancel }) {
 // ============================================================
 // PICTURES PANEL — paste images, preview, export to clipboard / disk
 // ============================================================
-function PicturesPanel({ pastes, commitPastes }) {
+function PicturesPanel({ pastes, commitPastes, meta }) {
   const [focusedCell, setFocusedCell] = useState(null);
   const [status, setStatus] = useState('');
   const items = useMemo(() => mergeItems(pastes), [pastes]);
@@ -758,7 +811,7 @@ function PicturesPanel({ pastes, commitPastes }) {
 
   const onCopy = async () => {
     try {
-      await copyHandoutToClipboard(items);
+      await copyHandoutToClipboard(items, meta.pictureRound.handoutInstruction);
       setStatusFlash('Handout copied to clipboard');
     } catch (e) {
       setStatusFlash(`Copy failed: ${e.message}`);
@@ -767,7 +820,7 @@ function PicturesPanel({ pastes, commitPastes }) {
 
   const onDownload = async () => {
     try {
-      await downloadHandoutPng(items);
+      await downloadHandoutPng(items, meta.pictureRound.handoutInstruction);
       setStatusFlash('Handout PNG downloaded');
     } catch (e) {
       setStatusFlash(`Download failed: ${e.message}`);
@@ -1097,6 +1150,57 @@ function Toggle({ label, value, onChange }) {
       </span>
       <span style={{ fontSize: 13, color: COLORS.text }}>{label}</span>
     </label>
+  );
+}
+
+function Segmented({ label, value, options, onChange }) {
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 6 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 4, padding: 3, background: COLORS.bg,
+        border: `1px solid ${COLORS.border}`, borderRadius: 8 }}>
+        {options.map((o) => {
+          const active = o.value === value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => onChange(o.value)}
+              style={{
+                flex: 1, padding: '6px 4px', borderRadius: 6, border: 0,
+                background: active ? COLORS.accent : 'transparent',
+                color: active ? COLORS.bg : COLORS.textDim,
+                fontFamily: 'inherit', fontSize: 12, fontWeight: active ? 600 : 500,
+                cursor: 'pointer', transition: 'background 120ms ease, color 120ms ease',
+              }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Slider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        fontSize: 12, color: COLORS.textDim, marginBottom: 6 }}>
+        <span>{label}</span>
+        <span style={{ color: COLORS.text, fontVariantNumeric: 'tabular-nums' }}>{value}{unit}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ width: '100%', accentColor: COLORS.accent, cursor: 'pointer' }}
+      />
+    </div>
   );
 }
 
