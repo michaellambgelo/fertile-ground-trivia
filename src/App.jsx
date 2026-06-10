@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ACCENTS, TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide,
   RoundOpener, PictureRoundInstructions, IntermissionSlide, QuestionSlide,
-  RoundRecap, PictureRoundRecap, TiebreakerIntroSlide, EndSlide,
+  RoundRecap, PictureRoundRecap, TiebreakerIntroSlide, EndSlide, NextEventSlide,
 } from './slides.jsx';
 import { loadRounds, loadTiebreakers, recapSplitsFor, normalizeQuestion, displayRoundNumber } from './rounds.js';
 import { loadPastes, mergeItems } from './pictures.js';
@@ -16,15 +16,18 @@ import { broadcast, useBroadcast } from './broadcast.js';
 // round its own accent color (Pokemon types, LOTR houses, MCU phases, etc.).
 // Map round number `n` (matches `DEFAULT_ROUNDS[i].n`, starts at 2) to an
 // ACCENTS key. Round 1 (picture round) + title/rules/prize/costume/end use
-// the global accent from TWEAK_DEFAULTS. Intermissions preview the NEXT
-// round's accent. Empty map (scaffold default) → no rotation; the global
-// accent is used everywhere.
+// the global DEFAULT_ACCENT. Intermissions preview the NEXT round's accent.
+// Empty map (scaffold default) → no rotation; the global accent is used
+// everywhere. Caution: hosts can add/remove rounds at runtime, which
+// renumbers `n` — accentFor degrades to the global accent on any miss.
 const ROUND_ACCENTS = {
   // 2: "accent-red",
   // 3: "accent-blue",
   // 4: "accent-green",
   // 5: "accent-gold",
 };
+// Global accent — themed forks set this to their signature ACCENTS key.
+const DEFAULT_ACCENT = "accent-red";
 function accentFor(n, global) {
   return ACCENTS[ROUND_ACCENTS[n]] || global;
 }
@@ -40,7 +43,7 @@ function App() {
   const pictureItems = mergeItems(pastes);
   // Display tweaks now live in meta (meta.display); slides still take a `tweaks` prop.
   const tweaks = meta.display || DEFAULT_META.display;
-  const accent = ACCENTS[tweaks.accent] || ACCENTS["accent-red"];
+  const accent = ACCENTS[DEFAULT_ACCENT];
   const stageRef = useRef(null);
 
   // Receive content + nav commands from the /control window.
@@ -112,8 +115,10 @@ function App() {
     slides.push(<PictureRoundInstructions key="r1-instr" tweaks={tweaks} accent={accent} />);
     slides.push(
       <IntermissionSlide key="int-r1" label="Intermission · Round 01"
-        nextRound={2} nextTitle="Warm-Up Round"
-        tweaks={tweaks} accent={accent}
+        nextRound={rounds[0] ? displayRoundNumber(rounds[0].n, true) : undefined}
+        nextTitle={rounds[0]?.title}
+        nextLabel={rounds[0] ? undefined : "Final Tally · Winners Revealed"}
+        tweaks={tweaks} accent={rounds[0] ? accentFor(rounds[0].n, accent) : accent}
       />
     );
     slides.push(
@@ -134,7 +139,7 @@ function App() {
     slides.push(
       <RoundOpener
         key={`r${r.n}-open`}
-        label={`Round 0${displayN} Opener`}
+        label={`Round ${String(displayN).padStart(2, '0')} Opener`}
         number={displayN}
         title={r.title}
         subtitle={r.subtitle}
@@ -173,7 +178,7 @@ function App() {
     slides.push(
       <IntermissionSlide
         key={`int-r${r.n}`}
-        label={`Intermission · Round 0${displayN}`}
+        label={`Intermission · Round ${String(displayN).padStart(2, '0')}`}
         nextRound={nextDisplayN}
         nextTitle={next?.title}
         nextLabel={next ? undefined : "Final Tally · Winners Revealed"}
@@ -205,6 +210,13 @@ function App() {
   // reached by hitting Next when there's an actual tie at the end of play.
   slides.push(<EndSlide key="end" tweaks={tweaks} accent={accent} end={meta.end} />);
 
+  // Next-event announcement — the natural end-of-night path flows
+  // Thanks → Next Event; tiebreakers stay parked past it as the
+  // only-if-tied overflow.
+  if (meta.show.nextEvent) {
+    slides.push(<NextEventSlide key="next-event" tweaks={tweaks} accent={accent} nextEvent={meta.nextEvent} />);
+  }
+
   // Tiebreakers — Final Wager (Final Jeopardy style) after the End slide.
   // Skip past these unless teams are tied; advance into them only when needed.
   if (meta.show.tiebreakers) {
@@ -215,7 +227,7 @@ function App() {
         <QuestionSlide
           key={`tb-q${i + 1}`}
           kind="tiebreaker"
-          round={5}
+          round={rounds[rounds.length - 1]?.n ?? 5}
           q={i + 1}
           total={tiebreakers.length}
           prompt={data.prompt}

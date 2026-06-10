@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { broadcast, useBroadcast } from './broadcast.js';
 
 // ============================================================
@@ -19,15 +19,6 @@ const SPACING = {
   paddingX: 120,
   titleGap: 48,
   itemGap: 28,
-};
-
-// Default tweaks — overridden by the runtime tweaks panel
-const DEFAULTS = {
-  accent: "accent-red",       // accent-blue | accent-green | accent-red | accent-gold
-  showStars: false,
-  showQNumbers: true,
-  showTimer: false,
-  timerSeconds: 60,
 };
 
 const ACCENTS = {
@@ -75,60 +66,8 @@ const slideBase = {
 const displayFont = "'Oswald', 'Bebas Neue', Impact, sans-serif";
 
 // ============================================================
-// BACKGROUND ATMOSPHERE — BackdropField + vignette + halftone
-// Theme-neutral atmospherics. Themes that want a starfield, snowfall,
-// embers, or any other dot-pattern can keep BackdropField on; themes
-// where the dot pattern reads off-theme should leave showStars off.
+// BACKGROUND ATMOSPHERE — vignette + halftone + grain
 // ============================================================
-function BackdropField({ visible = true, density = 1 }) {
-  // Pre-rendered dot positions (deterministic) for performance & no flicker
-  const stars = React.useMemo(() => {
-    const arr = [];
-    let seed = 7;
-    const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-    const count = Math.round(220 * density);
-    for (let i = 0; i < count; i++) {
-      arr.push({
-        x: rnd() * 100,
-        y: rnd() * 100,
-        s: rnd() * 1.6 + 0.4,
-        o: rnd() * 0.6 + 0.25,
-        tw: rnd() > 0.85,
-      });
-    }
-    return arr;
-  }, [density]);
-
-  return (
-    <div style={{
-      position: "absolute", inset: 0, pointerEvents: "none",
-      opacity: visible ? 1 : 0, transition: "opacity 600ms ease",
-    }}>
-      <svg width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="none">
-        {stars.map((s, i) => (
-          <circle
-            key={i}
-            cx={s.x * 19.2}
-            cy={s.y * 10.8}
-            r={s.s}
-            fill={PALETTE.paper}
-            opacity={s.o}
-          >
-            {s.tw && (
-              <animate
-                attributeName="opacity"
-                values={`${s.o};${s.o * 0.2};${s.o}`}
-                dur={`${2 + (i % 5)}s`}
-                repeatCount="indefinite"
-              />
-            )}
-          </circle>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
 function HalftoneOverlay({ opacity = 0.05 }) {
   return (
     <div style={{
@@ -166,7 +105,6 @@ function SlideAtmosphere({ tweaks, accent, variant = "dark" }) {
   // variant: "dark" (default), "paper" (cream)
   return (
     <>
-      {variant === "dark" && tweaks.showStars && <BackdropField visible={tweaks.showStars} />}
       {variant === "dark" && <HalftoneOverlay opacity={0.04} />}
       <GrainOverlay opacity={variant === "paper" ? 0.25 : 0.16} />
       {variant === "dark" && <Vignette />}
@@ -1241,7 +1179,7 @@ function TiebreakerIntroSlide({ tweaks, accent }) {
           padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
           height: "100%", display: "flex", flexDirection: "column",
         }}>
-          <Eyebrow accentHex={accent.hex}>Round 05 · Final Wager</Eyebrow>
+          <Eyebrow accentHex={accent.hex}>Sudden Death · Final Wager</Eyebrow>
           <div style={{
             fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
             letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
@@ -1344,9 +1282,69 @@ function EndSlide({ tweaks, accent, end }) {
   );
 }
 
+// ============================================================
+// SLIDE: NEXT EVENT — announcement for the next trivia night
+// ============================================================
+function NextEventSlide({ tweaks, accent, nextEvent }) {
+  const e = nextEvent || {};
+  return (
+    <section data-label="Next Event">
+      <div style={slideBase}>
+        <SlideAtmosphere tweaks={tweaks} accent={accent} />
+        <CornerMarks accentHex={accent.hex} />
+
+        <div style={{
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          height: "100%", display: "flex", flexDirection: "column", justifyContent: "center",
+          alignItems: "center", textAlign: "center",
+        }}>
+          {e.eyebrow && <Eyebrow accentHex={accent.hex}>{e.eyebrow}</Eyebrow>}
+          {e.hero && (
+            <div style={{
+              fontFamily: displayFont, fontWeight: 700, fontSize: 150, lineHeight: 0.95,
+              color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 36,
+              textShadow: `0 0 50px ${accent.glow}`,
+            }}>
+              {e.hero}
+            </div>
+          )}
+          {e.date && (
+            <div style={{
+              marginTop: 48, fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
+              color: accent.hex, letterSpacing: "0.06em",
+              textShadow: `0 0 32px ${accent.glow}`,
+            }}>
+              {e.date}
+            </div>
+          )}
+          {e.venue && (
+            <div style={{
+              marginTop: 28, fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
+              color: PALETTE.paperDim, letterSpacing: "0.28em", textTransform: "uppercase",
+            }}>
+              {e.venue}
+            </div>
+          )}
+          {e.detail && (
+            <div style={{
+              marginTop: 56, fontFamily: "'Inter', sans-serif", fontStyle: "italic",
+              fontWeight: 400, fontSize: TYPE_SCALE.body, lineHeight: 1.4,
+              color: PALETTE.paperDim, maxWidth: 1100,
+            }}>
+              {e.detail}
+            </div>
+          )}
+        </div>
+
+        <FooterBar left="Next Event" right={e.venue} accentHex={accent.hex} />
+      </div>
+    </section>
+  );
+}
+
 export {
   TitleSlide, RulesSlide, PrizeSlide, CostumeContestSlide, RoundOpener,
   PictureRoundInstructions, QuestionSlide, RoundRecap, PictureRoundRecap,
-  IntermissionSlide, TiebreakerIntroSlide, EndSlide,
-  ACCENTS, DEFAULTS, PALETTE,
+  IntermissionSlide, TiebreakerIntroSlide, EndSlide, NextEventSlide,
+  ACCENTS, PALETTE,
 };

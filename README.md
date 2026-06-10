@@ -1,10 +1,8 @@
 # Pub Trivia Scaffold
 
-The theme-neutral source-of-truth for browser-only **pub trivia** presentation decks. Teams play across 4 rounds × 10 questions on written paper sheets, hosts grade per round. Plus an optional picture round (10 images, played from a handout), and optional tiebreakers. **You probably don't run trivia events from this repo directly** — instead, run the `/new-pub-trivia-deck` Claude Code skill to clone this scaffold into a `~/Workspace/<slug>-trivia` sibling repo and re-skin it with theme content (real questions, themed slide copy, theme palette).
+The source-of-truth for browser-only **pub trivia** presentation decks — and a hostable **General Trivia** deck in its own right. Teams play across rounds of questions on written paper sheets, hosts grade per round. Plus an optional picture round (10 images, played from a handout), optional tiebreakers, and a next-event announcement slide. For *themed* events, run the `/new-pub-trivia-deck` Claude Code skill to clone this scaffold into a `~/Workspace/<slug>-trivia` sibling repo and re-skin it with theme content (real questions, themed slide copy, theme palette).
 
-The scaffold is fully runnable on its own with placeholder questions and a "GENERIC EDITION" title slide — useful for poking at the engine without a theme in the way, or just trying the format.
-
-> For **head-to-head barstool trivia** (12 rounds × 2 questions, two teams alternate, live scoring), see the [`barstool-trivia-scaffold`](https://gitlab.com/michaellambgelo/barstool-trivia-scaffold) sibling repo.
+The deck ships ready to host: 4 rounds × 10 real general-knowledge questions under a "GENERAL TRIVIA" title slide, with the round count and questions-per-round fully editable from the control window (or via CSV import).
 
 ## Quick start
 
@@ -33,11 +31,12 @@ A typical event flows through this slide order:
 2. **Rules** — four house rules (no phones, spelling best-attempt, hosts final, have fun).
 3. **Prize** *(optional)*, **Costume Contest** *(optional)* — toggleable from Edit Questions.
 4. **Round 1 (Picture Round)** *(optional)* — opener → instructions → intermission → recap. Always image-based; the host hands out a paper sheet generated from the Picture Round tab.
-5. **Rounds 2–5** *(or however many you configure)* — each round is opener → 10 questions → intermission → recap. Question slides have a per-question countdown timer in the corner.
-6. **Tiebreakers** *(optional)* — sudden-death intro + 3 tiebreaker questions for breaking ties.
-7. **End** — sign-off slide while hosts tally scores.
+5. **Rounds 2–5** *(or however many you configure — rounds and questions-per-round are editable)* — each round is opener → questions → intermission → recap. Question slides have a per-question countdown timer in the corner.
+6. **End** — sign-off slide while hosts tally scores.
+7. **Next Event** *(optional)* — announces the next trivia night (date / venue / detail, edited per event).
+8. **Tiebreakers** *(optional)* — parked at the very end of the deck; advance into them only when there's an actual tie.
 
-Anything from #3 onward (prize / costume / picture round / tiebreakers) can be hidden per-event from the control window's **Edit Questions → Slides to Include** card so a single deck handles "full event" and "casual game night" formats without code changes.
+Anything from #3 onward (prize / costume / picture round / next event / tiebreakers) can be hidden per-event from the control window's **Edit Questions → Slides to Include** card so a single deck handles "full event" and "casual game night" formats without code changes.
 
 ### Display keyboard shortcuts
 
@@ -60,9 +59,11 @@ Three tabs:
 A live outline of every slide in the deck with the active slide highlighted. Click any row to jump the display straight to that slide. The currently-active question slide also surfaces a **timer panel**: Start/Pause, Reset, ±10s — the timer state is broadcast to the display, so the room sees the seconds ticking down on the slide while you control it from your laptop.
 
 ### 2. Edit Questions tab
-Two cards at the top edit the **Title Slide** and **End Slide** strings (eyebrow, hero text, edition, hosts, date, sign-off). Below that, expandable cards per round let you edit each question. Edits are buffered locally — a "Save" button on each card pushes them to the display (and persists to `localStorage`), and a "Discard" reverts. There's also CSV/JSON import/export for bulk question editing in a spreadsheet.
+Cards at the top edit the **Title Slide**, **End Slide**, and **Next Event Slide** strings (eyebrow, hero text, edition, hosts, date, sign-off, next-event details). Below that, cards per round let you edit each question and answer — plus restructure the game: **add/remove questions** within a round (the "N Questions" kicker tracks the count automatically), and **add/remove whole rounds**. Edits are buffered locally — "Save & Push to Display" sends them to the display (and persists to `localStorage`), "Revert" discards.
 
-The same card has the **slide-toggle switches** that hide/show Prize, Costume Contest, Picture Round, and Tiebreakers in the deck.
+Bulk editing goes through **Export JSON / Export CSV / Import…**: JSON is the lossless round-trip format; CSV (`round,round_title,question,answer,subtitle,kicker`, with `TB` rows for tiebreakers) is spreadsheet-friendly — round count and questions-per-round are detected from the rows. The older `category,question` writer-template CSV still works and opens a category→round mapping dialog on import.
+
+The **Slides to Include** card has the toggle switches that hide/show Prize, Costume Contest, Picture Round, Next Event, and Tiebreakers in the deck.
 
 ### 3. Picture Round tab
 The picture round (Round 1) needs ten themed images. The workflow:
@@ -88,16 +89,12 @@ src/
 ├── main.jsx            entry — picks display vs control by URL hash
 ├── App.jsx             display: slide composition + broadcast wiring
 ├── ControlApp.jsx      control: presenter / editor / picture round tabs
-├── rounds.js           DEFAULT_ROUNDS (4 × 10) + localStorage persistence + recapSplitsFor
-├── meta.js             title/end slide text + slide visibility toggles
+├── rounds.js           DEFAULT_ROUNDS + structure helpers + JSON/CSV import-export + persistence
+├── csv.js              dependency-free CSV parse/serialize
+├── meta.js             title/end/next-event slide text + slide visibility toggles
 ├── pictures.js         picture round data + paste buffer
-├── handout.js          canvas-based PNG renderer for picture round handout
+├── handout.js          canvas-based PNG renderers (picture handout + answer sheets)
 ├── broadcast.js        BroadcastChannel helper + useBroadcast hook
 ├── deck-stage.js       custom element (vanilla JS) — handles 1920×1080 auto-scale
-├── slides.jsx          slide components + design system
-└── tweaks-panel.jsx    floating tweaks panel + useTweaks hook
+└── slides.jsx          slide components + design system
 ```
-
-## Tweaks panel
-
-The floating tweaks panel (bottom-right of the display window) is hidden by default. It activates when a parent window posts `__activate_edit_mode` — this is how the Claude Design host tool wires it up. Standalone, the panel won't appear unless that protocol fires.

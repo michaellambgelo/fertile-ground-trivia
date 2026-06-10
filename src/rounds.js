@@ -1,43 +1,83 @@
 // Round / question content. Default values + localStorage persistence.
 // Edits made in the /control window save here; both windows read from here.
 
+import { parseCsv, serializeCsv } from './csv.js';
+
 const STORAGE_KEY = 'pub-trivia-scaffold.rounds';
 const TIEBREAKER_STORAGE_KEY = 'pub-trivia-scaffold.tiebreakers';
 
 export const TIEBREAKER_COUNT = 3;
 
+// Real general-knowledge content — this deck is hostable as-is. Themed forks
+// (via /new-pub-trivia-deck) replace these arrays wholesale.
 export const DEFAULT_ROUNDS = [
   {
     n: 2, title: "Warm-Up Round",
     subtitle: "A gentle start. Easy points to set the tone.",
     kicker: "10 Questions",
-    questions: Array.from({ length: 10 }, (_, i) =>
-      `Placeholder question ${i + 1} for Round 2 · Warm-Up Round. Replace this with a real prompt.`
-    ),
+    questions: [
+      { prompt: "What is the capital city of Australia?", answer: "Canberra" },
+      { prompt: "How many sides does a hexagon have?", answer: "Six" },
+      { prompt: "Which planet in our solar system is known as the Red Planet?", answer: "Mars" },
+      { prompt: "What is the largest ocean on Earth?", answer: "The Pacific Ocean" },
+      { prompt: "In which country would you find the Eiffel Tower?", answer: "France" },
+      { prompt: "How many strings does a standard violin have?", answer: "Four" },
+      { prompt: "What is the chemical symbol for gold?", answer: "Au" },
+      { prompt: "What color do you get when you mix blue and yellow paint?", answer: "Green" },
+      { prompt: "Which animal is known as the King of the Jungle?", answer: "The lion" },
+      { prompt: "How many minutes are there in a full day?", answer: "1,440" },
+    ],
   },
   {
-    n: 3, title: "Categories Round",
-    subtitle: "A mix of topics — keep an open mind.",
+    n: 3, title: "Food & Drink",
+    subtitle: "Eat, drink, and answer accordingly.",
     kicker: "10 Questions",
-    questions: Array.from({ length: 10 }, (_, i) =>
-      `Placeholder question ${i + 1} for Round 3 · Categories Round. Replace this with a real prompt.`
-    ),
+    questions: [
+      { prompt: "Which country gave the world the rice dish paella?", answer: "Spain" },
+      { prompt: "What spirit is the traditional base of a mojito?", answer: "White rum" },
+      { prompt: "Hummus is primarily made from which legume?", answer: "Chickpeas" },
+      { prompt: "Which cheese is traditionally crumbled over a Greek salad?", answer: "Feta" },
+      { prompt: "The Japanese spirit sake is brewed from which grain?", answer: "Rice" },
+      { prompt: "Which nut is ground with sugar to make marzipan?", answer: "Almonds" },
+      { prompt: "The Scoville scale measures the heat of what?", answer: "Chili peppers" },
+      { prompt: "Which fruit is dried to make prunes?", answer: "Plums" },
+      { prompt: "Miso paste is traditionally made by fermenting which bean?", answer: "Soybeans" },
+      { prompt: "What is the Italian term for the appetizer course, literally meaning “before the meal”?", answer: "Antipasto" },
+    ],
   },
   {
-    n: 4, title: "Quotes & Catchphrases",
-    subtitle: "Who said it — and to whom?",
+    n: 4, title: "Music & Pop Culture",
+    subtitle: "Charts, screens, and stages.",
     kicker: "10 Questions",
-    questions: Array.from({ length: 10 }, (_, i) =>
-      `Placeholder question ${i + 1} for Round 4 · Quotes & Catchphrases. Replace this with a real prompt.`
-    ),
+    questions: [
+      { prompt: "Which artist released “Thriller”, the best-selling album of all time?", answer: "Michael Jackson" },
+      { prompt: "Freddie Mercury was the lead singer of which band?", answer: "Queen" },
+      { prompt: "In “The Wizard of Oz”, what is the name of Dorothy’s dog?", answer: "Toto" },
+      { prompt: "Which band recorded the 1977 album “Rumours”?", answer: "Fleetwood Mac" },
+      { prompt: "Jazz legend Miles Davis is famous for playing which instrument?", answer: "The trumpet" },
+      { prompt: "Daniel Craig first played James Bond in which 2006 film?", answer: "Casino Royale" },
+      { prompt: "What is Lady Gaga’s real first name?", answer: "Stefani" },
+      { prompt: "Which composer wrote the set of violin concertos known as “The Four Seasons”?", answer: "Antonio Vivaldi" },
+      { prompt: "Which pop star’s fans are known as “Swifties”?", answer: "Taylor Swift" },
+      { prompt: "Which 1994 film features the line “Life is like a box of chocolates”?", answer: "Forrest Gump" },
+    ],
   },
   {
     n: 5, title: "Final Round",
     subtitle: "The hardest questions. For the bragging rights.",
     kicker: "10 Questions · Tiebreaker Material",
-    questions: Array.from({ length: 10 }, (_, i) =>
-      `Placeholder question ${i + 1} for Round 5 · Final Round. Replace this with a real prompt.`
-    ),
+    questions: [
+      { prompt: "What is the only metal that is liquid at room temperature?", answer: "Mercury" },
+      { prompt: "In what year did the Berlin Wall fall?", answer: "1989" },
+      { prompt: "What is the longest river in Asia?", answer: "The Yangtze" },
+      { prompt: "Which element has the atomic number 1?", answer: "Hydrogen" },
+      { prompt: "The Strait of Gibraltar separates Spain from which country?", answer: "Morocco" },
+      { prompt: "What is the smallest country in the world by area?", answer: "Vatican City" },
+      { prompt: "Who wrote the novel “One Hundred Years of Solitude”?", answer: "Gabriel García Márquez" },
+      { prompt: "Which artist painted “The Persistence of Memory” — the one with the melting clocks?", answer: "Salvador Dalí" },
+      { prompt: "What is the name of the deepest known point in Earth’s oceans?", answer: "Challenger Deep, in the Mariana Trench" },
+      { prompt: "Which of the Seven Wonders of the Ancient World still stands today?", answer: "The Great Pyramid of Giza" },
+    ],
   },
 ];
 
@@ -78,11 +118,14 @@ export function resetRounds() {
 
 // ---- Tiebreakers ---------------------------------------------------------
 // Sudden-death questions used after the final round when teams are tied.
-// 3 placeholders by default; editable via the control window's editor.
+// Numeric closest-wins prompts; editable via the control window's editor.
+// Answers (for the host): 88 keys · 206 bones · 118 elements.
 
-export const DEFAULT_TIEBREAKERS = Array.from({ length: TIEBREAKER_COUNT }, (_, i) =>
-  `Placeholder tiebreaker ${i + 1}. Replace this with a real prompt.`
-);
+export const DEFAULT_TIEBREAKERS = [
+  "How many keys are on a standard full-size piano?",
+  "How many bones are in the adult human body?",
+  "How many elements are on the periodic table?",
+];
 
 export function loadTiebreakers() {
   try {
@@ -126,6 +169,31 @@ export function recapSplitsFor(round) {
 // on-screen number down by 1 so players see rounds 1..4 with no gap.
 export function displayRoundNumber(rN, pictureRoundShown) {
   return pictureRoundShown ? rN : rN - 1;
+}
+
+// ---- Round structure helpers ----------------------------------------------
+// Hosts can add/remove rounds and questions at runtime. Internal round
+// numbers always stay sequential starting at 2 (slot 1 = Picture Round);
+// renumber after every structural edit.
+
+export function renumberRounds(rounds) {
+  return rounds.map((r, i) => ({ ...r, n: i + 2 }));
+}
+
+export function makeBlankRound() {
+  // n is a placeholder — call renumberRounds after inserting.
+  return { n: 0, title: 'New Round', subtitle: '', kicker: deriveKicker(1), questions: [''] };
+}
+
+export function deriveKicker(count) {
+  return count === 1 ? '1 Question' : `${count} Questions`;
+}
+
+// Kickers matching this exact shape are treated as auto-generated and are
+// re-derived when the question count changes. Anything custom (e.g.
+// "10 Questions · Tiebreaker Material") is left alone.
+export function isAutoKicker(kicker) {
+  return /^\d+ Questions?$/.test(kicker || '');
 }
 
 // ---- Export / import ------------------------------------------------------
@@ -223,36 +291,16 @@ export function buildCsvTemplate() {
   return [...comments, ...body].join('\n');
 }
 
-function parseCsvRows(text) {
-  const rows = [];
-  let cur = [];
-  let field = '';
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; continue; }
-        inQuotes = false;
-        continue;
-      }
-      field += ch;
-      continue;
-    }
-    if (ch === '"') { inQuotes = true; continue; }
-    if (ch === ',') { cur.push(field); field = ''; continue; }
-    if (ch === '\r') continue;
-    if (ch === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; continue; }
-    field += ch;
-  }
-  if (field.length > 0 || cur.length > 0) { cur.push(field); rows.push(cur); }
-  return rows;
+// Strip blank lines + `#` comment lines; returns parsed rows with the header
+// row first. Shared by both CSV import formats.
+function cleanCsvRows(text) {
+  return parseCsv(text)
+    .filter((r) => !(r.length === 1 && r[0].trim() === ''))
+    .filter((r) => !(r[0] && r[0].trim().startsWith('#')));
 }
 
 export function parseQuestionsCsv(text) {
-  const rows = parseCsvRows(text)
-    .filter((r) => !(r.length === 1 && r[0].trim() === ''))
-    .filter((r) => !(r[0] && r[0].trim().startsWith('#')));
+  const rows = cleanCsvRows(text);
   if (rows.length === 0) {
     throw new Error('CSV is empty after stripping comments and blank lines.');
   }
@@ -276,16 +324,118 @@ export function parseQuestionsCsv(text) {
   return { categories: order, buckets };
 }
 
+// ---- Full-fidelity CSV ----------------------------------------------------
+// One row per question: `round,round_title,question,answer[,subtitle,kicker]`.
+// Columns are resolved by header name, any order. The `round` column is the
+// 1-based user-facing ordinal and is a grouping key only — rounds are sorted
+// numerically, compacted, and assigned internal n = ordinal + 1 (CSV round 1
+// → n: 2, since slot 1 is the Picture Round). `round` value "TB" groups the
+// tiebreaker rows (exactly TIEBREAKER_COUNT when present).
+// CSV cannot carry audioUrl/imageUrl/videoUrl/displayHint — JSON export is
+// the lossless format.
+
+export function buildQuestionsCsv(rounds, tiebreakers) {
+  const rows = [['round', 'round_title', 'question', 'answer', 'subtitle', 'kicker']];
+  rounds.forEach((r, ri) => {
+    r.questions.forEach((q, qi) => {
+      const { prompt, answer } = normalizeQuestion(q);
+      rows.push([
+        ri + 1,
+        qi === 0 ? r.title : '',
+        prompt,
+        answer || '',
+        qi === 0 ? r.subtitle : '',
+        qi === 0 ? r.kicker : '',
+      ]);
+    });
+  });
+  tiebreakers.forEach((t) => rows.push(['TB', '', t, '', '', '']));
+  return serializeCsv(rows);
+}
+
+export function parseQuestionsFullCsv(text) {
+  const rows = cleanCsvRows(text);
+  if (rows.length === 0) {
+    throw new Error('CSV is empty after stripping comments and blank lines.');
+  }
+  const header = rows[0].map((c) => c.trim().toLowerCase());
+  const col = {
+    round: header.indexOf('round'),
+    title: header.indexOf('round_title'),
+    question: header.indexOf('question'),
+    answer: header.indexOf('answer'),
+    subtitle: header.indexOf('subtitle'),
+    kicker: header.indexOf('kicker'),
+  };
+  if (col.round === -1 || col.question === -1) {
+    throw new Error('CSV header must include "round" and "question" columns.');
+  }
+  const groups = new Map();
+  const tb = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const get = (idx) => (idx === -1 ? '' : (row[idx] || '').trim());
+    const question = get(col.question);
+    if (!question) continue; // blank padding row
+    const roundRaw = get(col.round);
+    if (/^tb$/i.test(roundRaw)) {
+      tb.push(question);
+      continue;
+    }
+    const ordinal = Number(roundRaw);
+    if (!Number.isInteger(ordinal) || ordinal < 1) {
+      throw new Error(`Row ${i + 1}: "round" must be a positive whole number or "TB" (got "${roundRaw}").`);
+    }
+    if (!groups.has(ordinal)) {
+      groups.set(ordinal, { title: '', subtitle: '', kicker: '', questions: [] });
+    }
+    const g = groups.get(ordinal);
+    if (!g.title) g.title = get(col.title);
+    if (!g.subtitle) g.subtitle = get(col.subtitle);
+    if (!g.kicker) g.kicker = get(col.kicker);
+    const answer = get(col.answer);
+    g.questions.push(answer ? { prompt: question, answer } : question);
+  }
+  if (groups.size === 0) {
+    throw new Error('No question rows found.');
+  }
+  if (tb.length > 0 && tb.length !== TIEBREAKER_COUNT) {
+    throw new Error(`CSV has ${tb.length} "TB" rows; tiebreakers require exactly ${TIEBREAKER_COUNT}.`);
+  }
+  const ordinals = [...groups.keys()].sort((a, b) => a - b);
+  const rounds = renumberRounds(ordinals.map((ord, i) => {
+    const g = groups.get(ord);
+    return {
+      n: 0,
+      title: g.title || `Round ${i + 1}`,
+      subtitle: g.subtitle,
+      kicker: g.kicker || deriveKicker(g.questions.length),
+      questions: g.questions,
+    };
+  }));
+  return { rounds, tiebreakers: tb.length === TIEBREAKER_COUNT ? tb : null };
+}
+
 export function parseImport(text, filename = '') {
   const lower = filename.toLowerCase();
   const startsObj = /^\s*\{/.test(text);
   const isJsonByName = lower.endsWith('.json');
-  const isCsvByName = lower.endsWith('.csv');
-  if (isCsvByName && !isJsonByName) {
-    return { kind: 'csv', ...parseQuestionsCsv(text) };
-  }
-  if (isJsonByName || startsObj) {
+  if ((isJsonByName || startsObj) && !lower.endsWith('.csv')) {
     return { kind: 'json', ...parseQuestionsImport(text) };
   }
-  return { kind: 'csv', ...parseQuestionsCsv(text) };
+  return parseCsvImport(text);
+}
+
+// Sniff the CSV header row: `round,...` → full-fidelity import;
+// `category,question` → legacy writer-template mapping flow.
+function parseCsvImport(text) {
+  const rows = cleanCsvRows(text);
+  if (rows.length === 0) {
+    throw new Error('CSV is empty after stripping comments and blank lines.');
+  }
+  const header = rows[0].map((c) => c.trim().toLowerCase());
+  if (header.includes('round') && header.includes('question')) {
+    return { kind: 'csv-full', ...parseQuestionsFullCsv(text) };
+  }
+  return { kind: 'csv-categories', ...parseQuestionsCsv(text) };
 }

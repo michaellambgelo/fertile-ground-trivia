@@ -9,7 +9,7 @@ export const DEFAULT_META = {
   title: {
     eyebrow: "Presented at Fertile Ground",
     hero: "WELCOME",
-    edition: "GENERIC EDITION",
+    edition: "GENERAL TRIVIA",
     hosts: "Jack Smith · Michael Lamb",
     footerDate: "May 4 · 2026",
   },
@@ -18,20 +18,27 @@ export const DEFAULT_META = {
     hero2: "PLAYING.",
     subtitle: "HOSTS TALLYING SCORES · STAND BY",
   },
+  // Next-event announcement slide (after End, before tiebreakers).
+  nextEvent: {
+    eyebrow: "Before You Go",
+    hero: "NEXT TRIVIA NIGHT",
+    date: "TBA",
+    venue: "Fertile Ground",
+    detail: "Same teams welcome back. Bring a friend.",
+  },
   show: {
     prize: true,
     costumeContest: true,
     pictureRound: true,
     tiebreakers: true,
+    nextEvent: true,
   },
   pictureRound: {
     handoutInstruction: "Identify the character, place, ship or creature.",
   },
-  // Display tweaks — global accent + atmosphere + question-slide options.
+  // Display tweaks — question-slide options.
   // App.jsx derives `tweaks = meta.display`; slides consume it unchanged.
   display: {
-    accent: "accent-red",
-    showStars: false,
     showQNumbers: true,
     showTimer: true,
     timerSeconds: 60,
@@ -42,6 +49,7 @@ function clone(meta) {
   return {
     title: { ...meta.title },
     end: { ...meta.end },
+    nextEvent: { ...meta.nextEvent },
     show: { ...meta.show },
     pictureRound: { ...meta.pictureRound },
     display: { ...meta.display },
@@ -51,12 +59,20 @@ function clone(meta) {
 // Merge persisted state with defaults so adding a new field doesn't blow up
 // for users who saved meta before that field existed.
 function withDefaults(parsed) {
+  // `display` picks known keys explicitly (instead of a blind spread) so
+  // saves from before the accent/showStars removal come back clean.
+  const display = parsed?.display || {};
   return {
     title: { ...DEFAULT_META.title, ...(parsed?.title || {}) },
     end: { ...DEFAULT_META.end, ...(parsed?.end || {}) },
+    nextEvent: { ...DEFAULT_META.nextEvent, ...(parsed?.nextEvent || {}) },
     show: { ...DEFAULT_META.show, ...(parsed?.show || {}) },
     pictureRound: { ...DEFAULT_META.pictureRound, ...(parsed?.pictureRound || {}) },
-    display: { ...DEFAULT_META.display, ...(parsed?.display || {}) },
+    display: {
+      showQNumbers: display.showQNumbers ?? DEFAULT_META.display.showQNumbers,
+      showTimer: display.showTimer ?? DEFAULT_META.display.showTimer,
+      timerSeconds: display.timerSeconds ?? DEFAULT_META.display.timerSeconds,
+    },
   };
 }
 

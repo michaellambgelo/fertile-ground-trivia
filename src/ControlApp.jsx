@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS,
   loadTiebreakers, saveTiebreakers, resetTiebreakers, DEFAULT_TIEBREAKERS,
-  buildQuestionsExport, parseImport, buildCsvTemplate, recapSplitsFor,
-  normalizeQuestion, displayRoundNumber,
+  buildQuestionsExport, parseImport, buildCsvTemplate, buildQuestionsCsv,
+  recapSplitsFor, normalizeQuestion, displayRoundNumber,
+  renumberRounds, makeBlankRound, deriveKicker, isAutoKicker,
 } from './rounds.js';
 import { loadMeta, saveMeta, resetMeta, DEFAULT_META } from './meta.js';
 import { loadPastes, savePastes, clearPastes, mergeItems, PICTURE_FILENAME } from './pictures.js';
@@ -125,6 +126,7 @@ export default function ControlApp() {
           pastes={pastes}
           commitPastes={commitPastes}
           meta={meta}
+          rounds={rounds}
         />
       )}
     </div>
@@ -272,7 +274,7 @@ function TimerCard({ timer }) {
           {timer.enabled ? `${timer.seconds}s` : 'OFF'}
         </div>
         <div style={{ fontSize: 12, color: COLORS.textDim }}>
-          {timer.enabled ? (timer.paused ? 'Paused' : 'Running') : 'Timer disabled in tweaks panel'}
+          {timer.enabled ? (timer.paused ? 'Paused' : 'Running') : 'Runs on question slides — toggle in the Display card'}
         </div>
       </div>
       <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -384,6 +386,40 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
     setDraftTiebreakers((tb) => tb.map((t, idx) => (idx === i ? value : t)));
   };
 
+  // Structural edits — add/remove questions and whole rounds. Kickers that
+  // look auto-generated ("10 Questions") track the count; custom kickers
+  // are left alone. Round numbers stay sequential from 2 via renumberRounds.
+  const maybeRederiveKicker = (round) =>
+    isAutoKicker(round.kicker) ? { ...round, kicker: deriveKicker(round.questions.length) } : round;
+
+  const addQuestion = (ri) => {
+    setDirty(true);
+    setDraft((d) => d.map((r, i) => (
+      i === ri ? maybeRederiveKicker({ ...r, questions: [...r.questions.map(cloneQ), ''] }) : r
+    )));
+  };
+
+  const removeQuestion = (ri, qi) => {
+    setDirty(true);
+    setDraft((d) => d.map((r, i) => (
+      i === ri
+        ? maybeRederiveKicker({ ...r, questions: r.questions.filter((_, j) => j !== qi).map(cloneQ) })
+        : r
+    )));
+  };
+
+  const addRound = () => {
+    setDirty(true);
+    setDraft((d) => renumberRounds([...d, makeBlankRound()]));
+  };
+
+  const removeRound = (ri) => {
+    const r = draft[ri];
+    if (!confirm(`Remove Round ${r.n} — ${r.title || '(untitled)'} — and its ${r.questions.length} question${r.questions.length === 1 ? '' : 's'}?`)) return;
+    setDirty(true);
+    setDraft((d) => renumberRounds(d.filter((_, i) => i !== ri)));
+  };
+
   const updateMeta = (section, field, value) => {
     setDirty(true);
     setDraftMeta((m) => ({ ...m, [section]: { ...m[section], [field]: value } }));
@@ -402,7 +438,7 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
     setDirty(false);
   };
   const reset = () => {
-    if (!confirm('Reset all questions, tiebreakers, and slide settings to the original placeholders? This will discard your edits.')) return;
+    if (!confirm('Reset all questions, tiebreakers, and slide settings to the default General Trivia content? This will discard your edits.')) return;
     resetRounds();
     resetTiebreakers();
     resetMeta();
@@ -436,6 +472,13 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
     downloadFile(`trivia-questions-${date}.json`, JSON.stringify(payload, null, 2), 'application/json');
   };
 
+  // CSV export drops per-question media fields (audio/image/video/hint) —
+  // JSON is the lossless format.
+  const onExportCsv = () => {
+    const date = new Date().toISOString().slice(0, 10);
+    downloadFile(`trivia-questions-${date}.csv`, buildQuestionsCsv(draft, draftTiebreakers), 'text/csv');
+  };
+
   const onDownloadTemplate = () => {
     downloadFile('trivia-questions-template.csv', buildCsvTemplate(), 'text/csv');
   };
@@ -454,6 +497,10 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
           setDraft(result.rounds);
           setDraftTiebreakers(result.tiebreakers);
           setDirty(true);
+        } else if (result.kind === 'csv-full') {
+          setDraft(result.rounds);
+          if (result.tiebreakers) setDraftTiebreakers(result.tiebreakers);
+          setDirty(true);
         } else {
           setCsvImport({ categories: result.categories, buckets: result.buckets });
         }
@@ -470,7 +517,7 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
     const nextRounds = draft.map((r) => {
       const cat = mapping[`r${r.n}`];
       if (!cat || !buckets[cat]) return r;
-      return { ...r, questions: [...buckets[cat]] };
+      return maybeRederiveKicker({ ...r, questions: [...buckets[cat]] });
     });
     let nextTb = draftTiebreakers;
     if (mapping.tb && buckets[mapping.tb]) {
@@ -508,7 +555,8 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
         <Button onClick={revert} disabled={!dirty}>Revert</Button>
         <Button onClick={reset} secondary>Reset to Defaults</Button>
         <span style={{ width: 1, height: 24, background: COLORS.border, margin: '0 4px' }} />
-        <Button onClick={onExport}>Export</Button>
+        <Button onClick={onExport}>Export JSON</Button>
+        <Button onClick={onExportCsv}>Export CSV</Button>
         <Button onClick={onImportClick}>Import…</Button>
         <Button onClick={onDownloadTemplate} secondary>CSV Template</Button>
         <input
@@ -545,28 +593,17 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
           value={draftMeta.show.tiebreakers}
           onChange={(v) => updateMeta('show', 'tiebreakers', v)}
         />
+        <Toggle
+          label="Next event announcement (after the end slide)"
+          value={draftMeta.show.nextEvent}
+          onChange={(v) => updateMeta('show', 'nextEvent', v)}
+        />
       </Card>
 
       <Card title="Display">
         <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 8 }}>
           Presentation tweaks applied across the deck. Like everything else here, they push to the display on Save.
         </div>
-        <Segmented
-          label="Accent (global)"
-          value={draftMeta.display.accent}
-          onChange={(v) => updateMeta('display', 'accent', v)}
-          options={[
-            { value: 'accent-blue',  label: 'Blue' },
-            { value: 'accent-green', label: 'Green' },
-            { value: 'accent-red',   label: 'Red' },
-            { value: 'accent-gold',  label: 'Gold' },
-          ]}
-        />
-        <Toggle
-          label="Ambient backdrop"
-          value={draftMeta.display.showStars}
-          onChange={(v) => updateMeta('display', 'showStars', v)}
-        />
         <Toggle
           label="Show question numbers"
           value={draftMeta.display.showQNumbers}
@@ -613,6 +650,17 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
         <Field label="Subtitle" value={draftMeta.end.subtitle} onChange={(v) => updateMeta('end', 'subtitle', v)} />
       </Card>
 
+      <Card title="Next Event Slide">
+        <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 8 }}>
+          Announces the next trivia night. Shown after the end slide, before the tiebreakers.
+        </div>
+        <Field label="Eyebrow" value={draftMeta.nextEvent.eyebrow} onChange={(v) => updateMeta('nextEvent', 'eyebrow', v)} />
+        <Field label="Hero" value={draftMeta.nextEvent.hero} onChange={(v) => updateMeta('nextEvent', 'hero', v)} />
+        <Field label="Date" value={draftMeta.nextEvent.date} onChange={(v) => updateMeta('nextEvent', 'date', v)} />
+        <Field label="Venue" value={draftMeta.nextEvent.venue} onChange={(v) => updateMeta('nextEvent', 'venue', v)} />
+        <Field label="Detail" value={draftMeta.nextEvent.detail} onChange={(v) => updateMeta('nextEvent', 'detail', v)} multiline />
+      </Card>
+
       {draft.map((r, ri) => (
         <Card key={r.n} title={`Round ${r.n}`}>
           <Field label="Title" value={r.title} onChange={(v) => update([ri, 'title'], v)} />
@@ -628,10 +676,21 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
               index={qi}
               question={q}
               onChange={(field, value) => updateQuestion(ri, qi, field, value)}
+              onRemove={() => removeQuestion(ri, qi)}
+              removable={r.questions.length > 1}
             />
           ))}
+          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <Button onClick={() => addQuestion(ri)} secondary>+ Add question</Button>
+            <Button onClick={() => removeRound(ri)} secondary disabled={draft.length === 1}>
+              Remove round
+            </Button>
+          </div>
         </Card>
       ))}
+      <div>
+        <Button onClick={addRound} secondary>+ Add round</Button>
+      </div>
       <Card title="Tiebreakers — Final Wager">
         <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 8 }}>
           Used after the final round if teams are tied. Tied teams wager from their score, then write an answer — Final Jeopardy style. Up to three questions.
@@ -741,7 +800,7 @@ function CsvImportModal({ csvImport, rounds, onApply, onCancel }) {
 // ============================================================
 // PICTURES PANEL — paste images, preview, export to clipboard / disk
 // ============================================================
-function PicturesPanel({ pastes, commitPastes, meta }) {
+function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
   const [focusedCell, setFocusedCell] = useState(null);
   const [status, setStatus] = useState('');
   const items = useMemo(() => mergeItems(pastes), [pastes]);
@@ -839,7 +898,8 @@ function PicturesPanel({ pastes, commitPastes, meta }) {
 
   const onDownloadAnswers = async () => {
     try {
-      await downloadAnswersHandoutPng();
+      // One sheet covers every round: line count follows the longest round.
+      await downloadAnswersHandoutPng(Math.max(10, ...rounds.map((r) => r.questions.length)));
       setStatusFlash('Answers handout downloaded — photocopy one per team per round');
     } catch (e) {
       setStatusFlash(`Download failed: ${e.message}`);
@@ -1046,14 +1106,31 @@ function clamp(v, lo, hi) {
 // behind a toggle so the round panel stays scannable. Hidden fields keep any
 // values they had (no destructive collapse).
 // ============================================================
-function QuestionEditor({ index, question, onChange }) {
+function QuestionEditor({ index, question, onChange, onRemove, removable = false }) {
   const data = normalizeQuestion(question);
   const hasMedia = !!(data.audioUrl || data.imageUrl || data.videoUrl || data.displayHint);
   const [expanded, setExpanded] = useState(hasMedia);
   return (
     <div style={{
-      marginTop: 8, padding: '8px 0', borderTop: `1px solid ${COLORS.border}`,
+      marginTop: 8, padding: onRemove ? '8px 28px 8px 0' : '8px 0',
+      borderTop: `1px solid ${COLORS.border}`,
+      position: 'relative',
     }}>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          disabled={!removable}
+          title={removable ? 'Remove this question' : 'A round needs at least one question'}
+          style={{
+            position: 'absolute', top: 10, right: 0, border: 0,
+            background: 'transparent', color: removable ? COLORS.danger : COLORS.border,
+            fontFamily: 'inherit', fontSize: 16, lineHeight: 1,
+            cursor: removable ? 'pointer' : 'not-allowed', padding: '2px 6px',
+          }}
+        >
+          ×
+        </button>
+      )}
       <Field
         label={`Q${index + 1}`}
         value={data.prompt || ''}
@@ -1150,36 +1227,6 @@ function Toggle({ label, value, onChange }) {
       </span>
       <span style={{ fontSize: 13, color: COLORS.text }}>{label}</span>
     </label>
-  );
-}
-
-function Segmented({ label, value, options, onChange }) {
-  return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 6 }}>{label}</div>
-      <div style={{ display: 'flex', gap: 4, padding: 3, background: COLORS.bg,
-        border: `1px solid ${COLORS.border}`, borderRadius: 8 }}>
-        {options.map((o) => {
-          const active = o.value === value;
-          return (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => onChange(o.value)}
-              style={{
-                flex: 1, padding: '6px 4px', borderRadius: 6, border: 0,
-                background: active ? COLORS.accent : 'transparent',
-                color: active ? COLORS.bg : COLORS.textDim,
-                fontFamily: 'inherit', fontSize: 12, fontWeight: active ? 600 : 500,
-                cursor: 'pointer', transition: 'background 120ms ease, color 120ms ease',
-              }}
-            >
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -1282,6 +1329,9 @@ function buildSlideOutline(rounds, tiebreakers = [], meta = DEFAULT_META) {
     });
   });
   list.push({ key: 'end', label: `End — ${endLines || 'Thanks for Playing'}` });
+  if (meta.show?.nextEvent ?? true) {
+    list.push({ key: 'next-event', label: `Next Event — ${meta.nextEvent?.date || 'TBA'}` });
+  }
   if (meta.show?.tiebreakers ?? true) {
     list.push({ key: 'tb-intro', label: 'Tiebreakers — Final Wager (only if tied)' });
     tiebreakers.forEach((prompt, i) => {

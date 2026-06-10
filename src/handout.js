@@ -187,9 +187,10 @@ export async function downloadHandoutPng(items, instruction = DEFAULT_HANDOUT_IN
   triggerDownload(blob, filename);
 }
 
-// Generic "10 answer lines + team / round field" worksheet for non-picture
-// rounds. One PNG, photocopy as many as needed.
-export async function renderAnswersHandoutCanvas() {
+// Generic "numbered answer lines + team / round field" worksheet for
+// non-picture rounds. One PNG, photocopy as many as needed. Line count
+// follows the longest round (minimum 10) so custom-length rounds fit.
+export async function renderAnswersHandoutCanvas(lineCount = 10) {
   await ensureFonts();
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -220,13 +221,15 @@ export async function renderAnswersHandoutCanvas() {
   drawTeamField(ctx, MARGIN_X, fieldsY, (W - 2 * MARGIN_X) - roundBlockW - 80);
   drawLabeledLine(ctx, 'ROUND:', W - MARGIN_X - roundBlockW, fieldsY, roundLineW);
 
-  // 10 numbered answer lines, evenly spaced down the page.
+  // Numbered answer lines, evenly spaced down the page. The gap shrinks as
+  // the count grows so the last write-line stays inside the bottom margin;
+  // at the default 10 lines this works out to the original 70px gap.
   const LINES_TOP = 332;
-  const LINE_GAP = 70;
+  const LINE_GAP = Math.min(70, Math.floor((H - 70 - 44 - LINES_TOP) / Math.max(lineCount - 1, 1)));
   ctx.font = `700 36px 'Oswald', 'Bebas Neue', Impact, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < lineCount; i++) {
     const lineY = LINES_TOP + i * LINE_GAP;
     const numLabel = `${String(i + 1).padStart(2, '0')}.`;
     ctx.fillStyle = '#0B0E1A';
@@ -241,8 +244,8 @@ export async function renderAnswersHandoutCanvas() {
   return canvas;
 }
 
-export async function downloadAnswersHandoutPng(filename = 'answers-handout.png') {
-  const canvas = await renderAnswersHandoutCanvas();
+export async function downloadAnswersHandoutPng(lineCount = 10, filename = 'answers-handout.png') {
+  const canvas = await renderAnswersHandoutCanvas(lineCount);
   const blob = await canvasToBlob(canvas);
   if (!blob) throw new Error('Failed to create handout blob');
   triggerDownload(blob, filename);
