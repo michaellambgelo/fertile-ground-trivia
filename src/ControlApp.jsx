@@ -413,9 +413,18 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
     setDraft((d) => renumberRounds([...d, makeBlankRound()]));
   };
 
+  // Round cards mirror what the room sees: with the picture round hidden,
+  // display numbers shift down by 1, so show "Round 1 (R2)" — the display
+  // number first, internal n in parens (ROUND_ACCENTS and CSV mapping key
+  // off internal n). With the picture round shown the two match; plain "Round 2".
+  const roundCardTitle = (r) => {
+    if (draftMeta.show.pictureRound) return `Round ${r.n}`;
+    return `Round ${displayRoundNumber(r.n, false)} (R${r.n})`;
+  };
+
   const removeRound = (ri) => {
     const r = draft[ri];
-    if (!confirm(`Remove Round ${r.n} — ${r.title || '(untitled)'} — and its ${r.questions.length} question${r.questions.length === 1 ? '' : 's'}?`)) return;
+    if (!confirm(`Remove ${roundCardTitle(r)} — ${r.title || '(untitled)'} — and its ${r.questions.length} question${r.questions.length === 1 ? '' : 's'}?`)) return;
     setDirty(true);
     setDraft((d) => renumberRounds(d.filter((_, i) => i !== ri)));
   };
@@ -662,7 +671,7 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
       </Card>
 
       {draft.map((r, ri) => (
-        <Card key={r.n} title={`Round ${r.n}`}>
+        <Card key={r.n} title={roundCardTitle(r)}>
           <Field label="Title" value={r.title} onChange={(v) => update([ri, 'title'], v)} />
           <Field label="Subtitle" value={r.subtitle} onChange={(v) => update([ri, 'subtitle'], v)} multiline />
           <Field label="Kicker" value={r.kicker} onChange={(v) => update([ri, 'kicker'], v)} />
@@ -710,6 +719,7 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
         <CsvImportModal
           csvImport={csvImport}
           rounds={draft}
+          roundLabel={roundCardTitle}
           onApply={applyCsvMapping}
           onCancel={() => setCsvImport(null)}
         />
@@ -718,7 +728,7 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
   );
 }
 
-function CsvImportModal({ csvImport, rounds, onApply, onCancel }) {
+function CsvImportModal({ csvImport, rounds, roundLabel = (r) => `Round ${r.n}`, onApply, onCancel }) {
   const { categories, buckets } = csvImport;
   const [mapping, setMapping] = useState(() => {
     const init = { tb: '' };
@@ -731,7 +741,7 @@ function CsvImportModal({ csvImport, rounds, onApply, onCancel }) {
   const totalAssigned = Object.values(mapping).filter(Boolean).length;
 
   const slots = [
-    ...rounds.map((r) => ({ key: `r${r.n}`, label: `Round ${r.n} — ${r.title || '(untitled)'}` })),
+    ...rounds.map((r) => ({ key: `r${r.n}`, label: `${roundLabel(r)} — ${r.title || '(untitled)'}` })),
     { key: 'tb', label: `Tiebreakers (uses first 3 questions)` },
   ];
 
