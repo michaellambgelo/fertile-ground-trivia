@@ -20,6 +20,44 @@ export const DEFAULT_PICTURE_ITEMS = Array.from({ length: COUNT }, (_, i) => ({
 export const PICTURE_FILENAME = (i) =>
   `picture-${String(i + 1).padStart(2, '0')}.png`;
 
+// Picture-round cell geometry — single source of truth shared by the display
+// slide (slides.jsx), the canvas handout (handout.js), and the editor preview
+// (ControlApp.jsx) so all three crop/letterbox identically. Keys are the
+// `meta.pictureRound.aspect` values; `label` is shown in the editor picker.
+export const PICTURE_ASPECTS = {
+  '316 / 220': { w: 316, h: 220, label: 'Landscape (default)' },
+  '3 / 2': { w: 3, h: 2, label: 'Flag 3:2' },
+  '2 / 1': { w: 2, h: 1, label: 'Banner 2:1' },
+  '1 / 1': { w: 1, h: 1, label: 'Square 1:1' },
+};
+export const DEFAULT_ASPECT = '316 / 220';
+export const PICTURE_FITS = ['cover', 'contain'];
+
+// Resolve a `meta.pictureRound.aspect` string to a CSS value + numeric pair.
+// Unknown/garbage values degrade to the default (never yields `undefined`,
+// which would collapse the cells).
+export function resolveAspect(aspect) {
+  const a = PICTURE_ASPECTS[aspect] || PICTURE_ASPECTS[DEFAULT_ASPECT];
+  return { css: `${a.w} / ${a.h}`, w: a.w, h: a.h };
+}
+
+// Size the picture grid honoring BOTH the horizontal (cols across contentW) and
+// vertical (rows within availH) constraints, so tall aspects (e.g. square)
+// shrink and center instead of overflowing the 2-row grid. `cellExtra` is the
+// per-row non-photo height (handout's answer area + gap); the on-screen slide
+// passes 0. Returns the photo cell width/height and the actual grid width
+// (< contentW when vertically constrained → caller centers it).
+export function pictureGridLayout({ aspect, cols, rows, contentW, availH, gap, cellExtra = 0 }) {
+  const { w, h } = resolveAspect(aspect);
+  const cellWByCols = (contentW - gap * (cols - 1)) / cols;
+  const photoHMax = (availH - gap * (rows - 1)) / rows - cellExtra;
+  const cellWByRows = photoHMax > 0 ? photoHMax * (w / h) : cellWByCols;
+  const cellW = Math.min(cellWByCols, cellWByRows);
+  const photoH = cellW * (h / w);
+  const gridW = cellW * cols + gap * (cols - 1);
+  return { cellW, photoH, gridW };
+}
+
 // Default crop position: 50/50 = centered (matches `object-position: center`).
 export const DEFAULT_POSITION = { x: 50, y: 50 };
 

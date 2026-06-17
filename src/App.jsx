@@ -127,6 +127,7 @@ function App() {
         items={pictureItems}
         tweaks={tweaks}
         accent={accent}
+        pictureRound={meta.pictureRound}
       />
     );
   }

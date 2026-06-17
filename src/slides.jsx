@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { broadcast, useBroadcast } from './broadcast.js';
+import { resolveAspect, pictureGridLayout } from './pictures.js';
 
 // ============================================================
 // DESIGN SYSTEM — Theme-neutral scaffold; clone via /new-pub-trivia-deck and override PALETTE
@@ -1034,17 +1035,19 @@ function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, la
   );
 }
 
-function PictureRecapCell({ item, index, accent }) {
+function PictureRecapCell({ item, index, accent, fit = "cover", aspect = "316 / 220" }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => { setFailed(false); }, [item.src]);
   const showImage = item.src && !failed;
-  // The cell IS the photo box. Fixed aspect matches the canvas handout cell
-  // so the same objectPosition produces the same visible crop on both. The
-  // answer line that lives under each cell on the canvas is intentionally
-  // omitted on screen — it's only useful where contestants are writing.
+  // The cell IS the photo box. The aspect matches the canvas handout cell so
+  // the same objectPosition produces the same visible crop on both. `fit`
+  // "cover" crops to fill; "contain" letterboxes the whole image (flag round),
+  // where panning is meaningless so the image is simply centered. The answer
+  // line that lives under each cell on the canvas is intentionally omitted on
+  // screen — it's only useful where contestants are writing.
   return (
     <div style={{
-      aspectRatio: "316 / 220",
+      aspectRatio: resolveAspect(aspect).css,
       position: "relative",
       background: `${PALETTE.paper}06`,
       border: `2px solid ${accent.hex}33`,
@@ -1057,8 +1060,10 @@ function PictureRecapCell({ item, index, accent }) {
           alt={item.caption || `Picture ${index + 1}`}
           onError={() => setFailed(true)}
           style={{
-            width: "100%", height: "100%", objectFit: "cover", display: "block",
-            objectPosition: `${item.position?.x ?? 50}% ${item.position?.y ?? 50}%`,
+            width: "100%", height: "100%", objectFit: fit, display: "block",
+            objectPosition: fit === "contain"
+              ? "center"
+              : `${item.position?.x ?? 50}% ${item.position?.y ?? 50}%`,
           }}
         />
       ) : (
@@ -1108,7 +1113,17 @@ function PictureRecapCell({ item, index, accent }) {
 // design for the paper handout. Cells are placeholder boxes when item.src
 // is null; render an <img> when src is present.
 // ============================================================
-function PictureRoundRecap({ items, tweaks, accent }) {
+function PictureRoundRecap({ items, tweaks, accent, pictureRound }) {
+  const fit = pictureRound?.fit ?? "cover";
+  const aspect = pictureRound?.aspect ?? "316 / 220";
+  // Cap the grid width so tall aspects (square) shrink + center instead of
+  // overflowing the 2-row grid into the footer. `availH` is the vertical budget
+  // between the header and the footer; cells have no answer area on screen so
+  // cellExtra is 0. For the default landscape aspect this returns full width.
+  const grid = pictureGridLayout({
+    aspect, cols: 5, rows: 2, contentW: 1920 - SPACING.paddingX * 2,
+    availH: 560, gap: 24, cellExtra: 0,
+  });
   return (
     <section data-label="Picture Round Recap">
       <div style={slideBase}>
@@ -1141,10 +1156,10 @@ function PictureRoundRecap({ items, tweaks, accent }) {
           <div style={{
             marginTop: 32, display: "grid",
             gridTemplateColumns: "repeat(5, 1fr)",
-            gap: 24,
+            gap: 24, width: grid.gridW, alignSelf: "center",
           }}>
             {items.map((item, i) => (
-              <PictureRecapCell key={i} item={item} index={i} accent={accent} />
+              <PictureRecapCell key={i} item={item} index={i} accent={accent} fit={fit} aspect={aspect} />
             ))}
           </div>
         </div>

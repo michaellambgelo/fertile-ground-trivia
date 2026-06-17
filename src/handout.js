@@ -5,12 +5,16 @@
 //
 // Drawn directly on a 2D canvas — no html2canvas dependency, no DOM clones.
 
-import { PICTURE_FILENAME } from './pictures.js';
+import { PICTURE_FILENAME, DEFAULT_ASPECT, pictureGridLayout } from './pictures.js';
 
 // Fallback instruction line printed under the handout title. Callers (the
 // control window) pass the per-game value from meta.pictureRound; this keeps
 // the bare renderHandoutCanvas(items) call working on its own.
 const DEFAULT_HANDOUT_INSTRUCTION = 'Identify the character, place, ship or creature.';
+
+// Default cell render options — mirrors meta.pictureRound so the bare
+// renderHandoutCanvas(items) call reproduces the historical layout.
+const DEFAULT_HANDOUT_OPTS = { fit: 'cover', aspect: DEFAULT_ASPECT };
 
 // Page geometry — mirrors the on-screen PictureRoundRecap slide so the same
 // image crops the same way in both surfaces. Margins, gaps, and per-cell
@@ -26,12 +30,9 @@ const INSTRUCTION_Y = RULE_Y + 32;               // 242
 const GAP = 24;                                  // matches slide grid gap
 const COLS = 5;
 const ROWS = 2;
-void ROWS;  // referenced via items.length / COLS in the loop, kept for documentation
-// Each cell is split into a photo box (top, fixed aspect 316/220) and an
-// answer area (bottom). Same dimensions as the slide PictureRecapCell so the
-// same objectPosition produces the same visible crop on both surfaces.
-const PHOTO_ASPECT_W = 316;
-const PHOTO_ASPECT_H = 220;
+// Each cell is split into a photo box (top, aspect from meta.pictureRound) and
+// an answer area (bottom). The photo aspect matches the slide PictureRecapCell
+// so the same objectPosition produces the same visible crop on both surfaces.
 const ANSWER_HEIGHT = 56;                        // matches slide answer-line area
 const PHOTO_GAP = 14;                            // matches slide gap between photo and answer
 const ANSWER_LINE_THICKNESS = 2;
@@ -54,7 +55,8 @@ function loadImage(src) {
   });
 }
 
-export async function renderHandoutCanvas(items, instruction = DEFAULT_HANDOUT_INSTRUCTION) {
+export async function renderHandoutCanvas(items, instruction = DEFAULT_HANDOUT_INSTRUCTION, opts = DEFAULT_HANDOUT_OPTS) {
+  const fit = opts?.fit === 'contain' ? 'contain' : 'cover';
   await ensureFonts();
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -88,14 +90,19 @@ export async function renderHandoutCanvas(items, instruction = DEFAULT_HANDOUT_I
   // TEAM field — right side of the instruction row.
   drawTeamField(ctx, W - MARGIN_X - 480, INSTRUCTION_Y, 480);
 
-  // Cell geometry — derive everything from the cell width (set by COLS+GAP)
-  // and the fixed photo-box aspect, so the printed handout's cells match the
-  // on-screen slide's cells exactly.
-  const gridW = W - MARGIN_X * 2;
-  const cellW = (gridW - GAP * (COLS - 1)) / COLS;
-  const photoH = cellW * (PHOTO_ASPECT_H / PHOTO_ASPECT_W);
-  const rowH = photoH + PHOTO_GAP + ANSWER_HEIGHT;
+  // Cell geometry — honor both the column width and the available vertical
+  // budget so tall aspects (square) shrink + center instead of running off the
+  // bottom of the page. Mirrors the on-screen slide via the shared helper, so
+  // the same photo-box aspect produces the same crop on both surfaces.
   const GRID_TOP = INSTRUCTION_Y + 80;            // ~322; leaves headroom under the instruction
+  const GRID_BOTTOM = H - 72;                      // bottom page margin
+  const { cellW, photoH, gridW } = pictureGridLayout({
+    aspect: opts?.aspect, cols: COLS, rows: ROWS,
+    contentW: W - MARGIN_X * 2, availH: GRID_BOTTOM - GRID_TOP,
+    gap: GAP, cellExtra: PHOTO_GAP + ANSWER_HEIGHT,
+  });
+  const rowH = photoH + PHOTO_GAP + ANSWER_HEIGHT;
+  const startX = (W - gridW) / 2;                  // center horizontally (= MARGIN_X for full-width grids)
 
   // Pre-load every image (parallel)
   const images = await Promise.all(items.map((it) => loadImage(it.src)));
@@ -103,7 +110,7 @@ export async function renderHandoutCanvas(items, instruction = DEFAULT_HANDOUT_I
   for (let i = 0; i < items.length; i++) {
     const r = Math.floor(i / COLS);
     const c = i % COLS;
-    const x = MARGIN_X + c * (cellW + GAP);
+    const x = startX + c * (cellW + GAP);
     const y = GRID_TOP + r * (rowH + GAP);
 
     // Photo box background (faint) for empty cells; transparent if image present
@@ -117,19 +124,29 @@ export async function renderHandoutCanvas(items, instruction = DEFAULT_HANDOUT_I
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y + 1, cellW - 2, photoH - 2);
 
-    // Image (object-fit: cover) inside the photo box, with crop position
-    // honored — same math object-position uses in the DOM: position.x/y are
-    // 0-100 and select which slice of the over-sized scaled image lands in
-    // the cell.
+    // Image inside the photo box. "cover" scales to fill + crops, honoring the
+    // per-image position the same way object-position does in the DOM
+    // (position.x/y are 0-100, selecting which slice of the over-sized image
+    // lands in the cell). "contain" scales to fit inside + centers, showing the
+    // whole image (flag round) — position is meaningless there and ignored.
     if (images[i]) {
       const img = images[i];
-      const ratio = Math.max(cellW / img.width, photoH / img.height);
-      const dW = img.width * ratio;
-      const dH = img.height * ratio;
-      const px = (items[i].position?.x ?? 50) / 100;
-      const py = (items[i].position?.y ?? 50) / 100;
-      const dX = x + (cellW - dW) * px;
-      const dY = y + (photoH - dH) * py;
+      let dW, dH, dX, dY;
+      if (fit === 'contain') {
+        const ratio = Math.min(cellW / img.width, photoH / img.height);
+        dW = img.width * ratio;
+        dH = img.height * ratio;
+        dX = x + (cellW - dW) / 2;
+        dY = y + (photoH - dH) / 2;
+      } else {
+        const ratio = Math.max(cellW / img.width, photoH / img.height);
+        dW = img.width * ratio;
+        dH = img.height * ratio;
+        const px = (items[i].position?.x ?? 50) / 100;
+        const py = (items[i].position?.y ?? 50) / 100;
+        dX = x + (cellW - dW) * px;
+        dY = y + (photoH - dH) * py;
+      }
       ctx.save();
       ctx.beginPath();
       ctx.rect(x + 2, y + 2, cellW - 4, photoH - 4);
@@ -170,8 +187,8 @@ function canvasToBlob(canvas, type = 'image/png') {
   return new Promise((resolve) => canvas.toBlob(resolve, type));
 }
 
-export async function copyHandoutToClipboard(items, instruction = DEFAULT_HANDOUT_INSTRUCTION) {
-  const canvas = await renderHandoutCanvas(items, instruction);
+export async function copyHandoutToClipboard(items, instruction = DEFAULT_HANDOUT_INSTRUCTION, opts = DEFAULT_HANDOUT_OPTS) {
+  const canvas = await renderHandoutCanvas(items, instruction, opts);
   const blob = await canvasToBlob(canvas);
   if (!blob) throw new Error('Failed to create handout blob');
   if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
@@ -180,8 +197,8 @@ export async function copyHandoutToClipboard(items, instruction = DEFAULT_HANDOU
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
 }
 
-export async function downloadHandoutPng(items, instruction = DEFAULT_HANDOUT_INSTRUCTION, filename = 'picture-round-handout.png') {
-  const canvas = await renderHandoutCanvas(items, instruction);
+export async function downloadHandoutPng(items, instruction = DEFAULT_HANDOUT_INSTRUCTION, filename = 'picture-round-handout.png', opts = DEFAULT_HANDOUT_OPTS) {
+  const canvas = await renderHandoutCanvas(items, instruction, opts);
   const blob = await canvasToBlob(canvas);
   if (!blob) throw new Error('Failed to create handout blob');
   triggerDownload(blob, filename);
