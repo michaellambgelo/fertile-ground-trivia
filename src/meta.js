@@ -3,6 +3,8 @@
 // load/save) so the control window can edit and the display window picks up
 // changes via broadcast.
 
+import { PICTURE_FITS, PICTURE_ASPECTS } from './pictures.js';
+
 const STORAGE_KEY = 'pub-trivia-scaffold.meta';
 
 export const DEFAULT_META = {
@@ -35,6 +37,11 @@ export const DEFAULT_META = {
   },
   pictureRound: {
     handoutInstruction: "Identify the character, place, ship or creature.",
+    // How picture cells render: "cover" crops images to fill, "contain"
+    // letterboxes the whole image (e.g. a flag round). `aspect` is a key into
+    // PICTURE_ASPECTS. Both are runtime-editable in the Picture Round card.
+    fit: "cover",
+    aspect: "316 / 220",
   },
   // Display tweaks — question-slide options.
   // App.jsx derives `tweaks = meta.display`; slides consume it unchanged.
@@ -67,7 +74,18 @@ function withDefaults(parsed) {
     end: { ...DEFAULT_META.end, ...(parsed?.end || {}) },
     nextEvent: { ...DEFAULT_META.nextEvent, ...(parsed?.nextEvent || {}) },
     show: { ...DEFAULT_META.show, ...(parsed?.show || {}) },
-    pictureRound: { ...DEFAULT_META.pictureRound, ...(parsed?.pictureRound || {}) },
+    // Explicit, validated pick (like `display`) so a renamed/removed preset
+    // degrades to the default instead of breaking the cell layout.
+    pictureRound: {
+      handoutInstruction:
+        parsed?.pictureRound?.handoutInstruction ?? DEFAULT_META.pictureRound.handoutInstruction,
+      fit: PICTURE_FITS.includes(parsed?.pictureRound?.fit)
+        ? parsed.pictureRound.fit
+        : DEFAULT_META.pictureRound.fit,
+      aspect: PICTURE_ASPECTS[parsed?.pictureRound?.aspect]
+        ? parsed.pictureRound.aspect
+        : DEFAULT_META.pictureRound.aspect,
+    },
     display: {
       showQNumbers: display.showQNumbers ?? DEFAULT_META.display.showQNumbers,
       showTimer: display.showTimer ?? DEFAULT_META.display.showTimer,

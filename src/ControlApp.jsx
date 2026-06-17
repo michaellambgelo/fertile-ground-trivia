@@ -7,7 +7,10 @@ import {
   renumberRounds, makeBlankRound, deriveKicker, isAutoKicker,
 } from './rounds.js';
 import { loadMeta, saveMeta, resetMeta, DEFAULT_META } from './meta.js';
-import { loadPastes, savePastes, clearPastes, mergeItems, PICTURE_FILENAME } from './pictures.js';
+import {
+  loadPastes, savePastes, clearPastes, mergeItems, PICTURE_FILENAME,
+  PICTURE_ASPECTS, resolveAspect,
+} from './pictures.js';
 import {
   copyHandoutToClipboard, downloadHandoutPng, downloadAllImages, downloadAnswersHandoutPng,
 } from './handout.js';
@@ -99,9 +102,16 @@ export default function ControlApp() {
     broadcast('sync:request', null);
   }, []);
 
+  // The Picture Round interface only applies when that round is in the deck.
+  // If it's switched off while the Picture Round tab is open, fall back.
+  const pictureRoundEnabled = meta.show.pictureRound;
+  useEffect(() => {
+    if (!pictureRoundEnabled && tab === 'pictures') setTab('present');
+  }, [pictureRoundEnabled, tab]);
+
   return (
     <div style={baseStyle}>
-      <Header tab={tab} setTab={setTab} currentSlide={currentSlide} />
+      <Header tab={tab} setTab={setTab} currentSlide={currentSlide} pictureRoundEnabled={pictureRoundEnabled} />
       {tab === 'present' && (
         <PresenterPanel
           currentSlide={currentSlide}
@@ -121,7 +131,7 @@ export default function ControlApp() {
           commitMeta={commitMeta}
         />
       )}
-      {tab === 'pictures' && (
+      {tab === 'pictures' && pictureRoundEnabled && (
         <PicturesPanel
           pastes={pastes}
           commitPastes={commitPastes}
@@ -136,11 +146,11 @@ export default function ControlApp() {
 // ============================================================
 // HEADER
 // ============================================================
-function Header({ tab, setTab, currentSlide }) {
+function Header({ tab, setTab, currentSlide, pictureRoundEnabled = true }) {
   const tabs = [
     { id: 'present', label: 'Presenter' },
     { id: 'edit', label: 'Edit Questions' },
-    { id: 'pictures', label: 'Picture Round' },
+    { id: 'pictures', label: 'Picture Round', disabled: !pictureRoundEnabled },
   ];
   return (
     <header style={{
@@ -155,12 +165,17 @@ function Header({ tab, setTab, currentSlide }) {
       </div>
       <nav style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
+          <button key={t.id}
+            onClick={() => { if (!t.disabled) setTab(t.id); }}
+            disabled={t.disabled}
+            title={t.disabled ? 'Picture round is off — enable it under "Slides to Include"' : undefined}
             style={{
               padding: '6px 14px', borderRadius: 6, border: '1px solid transparent',
               background: tab === t.id ? COLORS.accentDim : 'transparent',
               color: tab === t.id ? COLORS.accent : COLORS.textDim,
-              fontFamily: 'inherit', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+              cursor: t.disabled ? 'not-allowed' : 'pointer',
+              opacity: t.disabled ? 0.4 : 1,
               whiteSpace: 'nowrap',
             }}>
             {t.label}
@@ -637,12 +652,51 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
       </Card>
 
       <Card title="Picture Round">
-        <Field
-          label="Handout instruction"
-          value={draftMeta.pictureRound.handoutInstruction}
-          onChange={(v) => updateMeta('pictureRound', 'handoutInstruction', v)}
-          multiline
-        />
+        {!draftMeta.show.pictureRound && (
+          <div style={{ fontSize: 12, color: COLORS.warn, marginBottom: 10 }}>
+            Picture round is off (toggle it on under “Slides to Include”). These settings are disabled.
+          </div>
+        )}
+        <div style={{
+          opacity: draftMeta.show.pictureRound ? 1 : 0.4,
+          pointerEvents: draftMeta.show.pictureRound ? 'auto' : 'none',
+        }}>
+          <Field
+            label="Handout instruction"
+            value={draftMeta.pictureRound.handoutInstruction}
+            onChange={(v) => updateMeta('pictureRound', 'handoutInstruction', v)}
+            multiline
+          />
+          <Toggle
+            label="Show whole image (letterbox)"
+            value={draftMeta.pictureRound.fit === 'contain'}
+            onChange={(v) => updateMeta('pictureRound', 'fit', v ? 'contain' : 'cover')}
+          />
+          <div style={{ fontSize: 11, color: COLORS.textDim, marginTop: 4 }}>
+            On = the entire image is shown (e.g. a flag round); cropping/panning is disabled.
+            Off = images fill each cell and can be cropped + panned.
+          </div>
+          <label style={{
+            display: 'grid', gridTemplateColumns: '1fr 220px', gap: 12,
+            alignItems: 'center', marginTop: 12,
+          }}>
+            <span style={{ fontSize: 13 }}>Cell shape</span>
+            <select
+              value={draftMeta.pictureRound.aspect}
+              onChange={(e) => updateMeta('pictureRound', 'aspect', e.target.value)}
+              disabled={!draftMeta.show.pictureRound}
+              style={{
+                padding: '6px 8px', background: COLORS.bg, color: COLORS.text,
+                border: `1px solid ${COLORS.border}`, borderRadius: 6,
+                fontFamily: 'inherit', fontSize: 13,
+              }}
+            >
+              {Object.entries(PICTURE_ASPECTS).map(([key, a]) => (
+                <option key={key} value={key}>{a.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </Card>
 
       <Card title="Title Slide">
@@ -814,6 +868,11 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
   const [focusedCell, setFocusedCell] = useState(null);
   const [status, setStatus] = useState('');
   const items = useMemo(() => mergeItems(pastes), [pastes]);
+  // Cell fit/aspect come from the saved meta (like handoutInstruction), so the
+  // editor preview + exported handout match the display's last-saved settings.
+  const fit = meta.pictureRound?.fit ?? 'cover';
+  const aspect = meta.pictureRound?.aspect ?? '316 / 220';
+  const handoutOpts = { fit, aspect };
 
   const setStatusFlash = useCallback((msg) => {
     setStatus(msg);
@@ -880,7 +939,7 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
 
   const onCopy = async () => {
     try {
-      await copyHandoutToClipboard(items, meta.pictureRound.handoutInstruction);
+      await copyHandoutToClipboard(items, meta.pictureRound.handoutInstruction, handoutOpts);
       setStatusFlash('Handout copied to clipboard');
     } catch (e) {
       setStatusFlash(`Copy failed: ${e.message}`);
@@ -889,7 +948,7 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
 
   const onDownload = async () => {
     try {
-      await downloadHandoutPng(items, meta.pictureRound.handoutInstruction);
+      await downloadHandoutPng(items, meta.pictureRound.handoutInstruction, 'picture-round-handout.png', handoutOpts);
       setStatusFlash('Handout PNG downloaded');
     } catch (e) {
       setStatusFlash(`Download failed: ${e.message}`);
@@ -952,6 +1011,8 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
               isPasted={items[i].isPasted}
               position={items[i].position}
               focused={focusedCell === i}
+              fit={fit}
+              aspect={aspect}
               onFocus={() => setFocusedCell(i)}
               onPaste={(e) => handlePaste(i, e)}
               onDrop={(e) => handleDrop(i, e)}
@@ -978,13 +1039,16 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
 }
 
 function PictureCell({
-  i, dataUrl, fallbackSrc, isPasted, position, focused,
+  i, dataUrl, fallbackSrc, isPasted, position, focused, fit = 'cover', aspect = '316 / 220',
   onFocus, onPaste, onDrop, onClear, onPositionChange,
 }) {
   const ref = useRef(null);
   const [diskFailed, setDiskFailed] = useState(false);
   const [dragging, setDragging] = useState(false);
   const showSrc = dataUrl || (!diskFailed ? fallbackSrc : null);
+  // Cropping only makes sense in "cover"; "contain" letterboxes the whole
+  // image, so panning + the reset button are disabled there.
+  const canPan = fit === 'cover';
   const isPositioned = (position?.x ?? 50) !== 50 || (position?.y ?? 50) !== 50;
 
   // Drag-to-pan: when an image is loaded, holding pointer down and dragging
@@ -992,6 +1056,7 @@ function PictureCell({
   // percentage deltas, inverted (drag right = show more of the right edge).
   const onPointerDown = (e) => {
     if (!showSrc) return;          // empty cell: leave click→focus behavior alone
+    if (!canPan) return;           // contain mode: nothing to crop
     if (e.button !== 0) return;    // left click only
     e.preventDefault();
     const rect = ref.current.getBoundingClientRect();
@@ -1028,10 +1093,10 @@ function PictureCell({
       onDrop={onDrop}
       onPointerDown={onPointerDown}
       style={{
-        position: 'relative', aspectRatio: '1 / 1', borderRadius: 6,
+        position: 'relative', aspectRatio: resolveAspect(aspect).css, borderRadius: 6,
         border: `2px solid ${focused ? COLORS.accent : COLORS.border}`,
         background: COLORS.bg, overflow: 'hidden',
-        cursor: showSrc ? (dragging ? 'grabbing' : 'grab') : 'pointer',
+        cursor: showSrc && canPan ? (dragging ? 'grabbing' : 'grab') : 'pointer',
         outline: 'none', userSelect: 'none', touchAction: 'none',
       }}
     >
@@ -1042,8 +1107,8 @@ function PictureCell({
           draggable={false}
           onError={() => { if (!isPasted) setDiskFailed(true); }}
           style={{
-            width: '100%', height: '100%', objectFit: 'cover', display: 'block',
-            objectPosition: `${position?.x ?? 50}% ${position?.y ?? 50}%`,
+            width: '100%', height: '100%', objectFit: fit, display: 'block',
+            objectPosition: canPan ? `${position?.x ?? 50}% ${position?.y ?? 50}%` : 'center',
             pointerEvents: 'none',  // pointer events go to the cell so drag works
           }}
         />
@@ -1065,7 +1130,7 @@ function PictureCell({
       }}>
         {String(i + 1).padStart(2, '0')}
       </div>
-      {showSrc && isPositioned && (
+      {showSrc && canPan && isPositioned && (
         <button
           type="button"
           title="Reset crop"
