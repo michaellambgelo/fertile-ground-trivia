@@ -974,8 +974,23 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex =
 // ============================================================
 // SLIDE: INTERMISSION
 // ============================================================
+const INTERMISSION_WORDS = ["SUBMIT.", "STRETCH.", "REFILL.", "REGROUP."];
+
 function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, label }) {
   const upNextText = nextLabel || `Round ${String(nextRound).padStart(2, "0")} · ${nextTitle}`;
+  // Walk the accent highlight top-to-bottom through the words, looping while the
+  // slide is on screen. Honor reduced-motion by holding on the first word.
+  const [activeWord, setActiveWord] = useState(0);
+  useEffect(() => {
+    const reduce = typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) return;
+    const id = setInterval(
+      () => setActiveWord((i) => (i + 1) % INTERMISSION_WORDS.length),
+      1100,
+    );
+    return () => clearInterval(id);
+  }, []);
   return (
     <section data-label={label}>
       <div style={slideBase}>
@@ -988,34 +1003,20 @@ function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, la
           alignItems: "center", textAlign: "center",
         }}>
           <Eyebrow accentHex={accent.hex}>Intermission</Eyebrow>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
-            color: accent.hex, letterSpacing: "0.04em", marginTop: 24,
-            textShadow: `0 0 50px ${accent.glow}`,
-          }}>
-            SUBMIT.
-          </div>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
-            color: PALETTE.paper, letterSpacing: "0.04em",
-            textShadow: `0 0 40px ${accent.glow}`,
-          }}>
-            STRETCH.
-          </div>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
-            color: PALETTE.paper, letterSpacing: "0.04em",
-            textShadow: `0 0 40px ${accent.glow}`,
-          }}>
-            REFILL.
-          </div>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
-            color: PALETTE.paper, letterSpacing: "0.04em",
-            textShadow: `0 0 40px ${accent.glow}`,
-          }}>
-            REGROUP.
-          </div>
+          {INTERMISSION_WORDS.map((word, i) => {
+            const active = i === activeWord;
+            return (
+              <div key={word} style={{
+                fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
+                letterSpacing: "0.04em", marginTop: i === 0 ? 24 : 0,
+                color: active ? accent.hex : PALETTE.paper,
+                textShadow: active ? `0 0 50px ${accent.glow}` : `0 0 40px ${accent.glow}`,
+                transition: "color 450ms ease, text-shadow 450ms ease",
+              }}>
+                {word}
+              </div>
+            );
+          })}
 
           <div style={{ display: "flex", alignItems: "center", gap: 28, marginTop: 36 }}>
             <div style={{ height: 2, width: 180, background: PALETTE.paper, opacity: 0.4 }} />
@@ -1150,7 +1151,7 @@ function PictureRoundRecap({ items, tweaks, accent, pictureRound }) {
             marginTop: 24, fontFamily: "'Inter', sans-serif", fontStyle: "italic",
             fontSize: TYPE_SCALE.body, color: PALETTE.paperDim, maxWidth: 1200,
           }}>
-            Identify the character or creature.
+            {pictureRound?.instruction ?? "Identify the character, place, ship or creature."}
           </div>
 
           <div style={{

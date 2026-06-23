@@ -662,9 +662,9 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
           pointerEvents: draftMeta.show.pictureRound ? 'auto' : 'none',
         }}>
           <Field
-            label="Handout instruction"
-            value={draftMeta.pictureRound.handoutInstruction}
-            onChange={(v) => updateMeta('pictureRound', 'handoutInstruction', v)}
+            label="Picture Round Instruction"
+            value={draftMeta.pictureRound.instruction}
+            onChange={(v) => updateMeta('pictureRound', 'instruction', v)}
             multiline
           />
           <Toggle
@@ -868,7 +868,7 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
   const [focusedCell, setFocusedCell] = useState(null);
   const [status, setStatus] = useState('');
   const items = useMemo(() => mergeItems(pastes), [pastes]);
-  // Cell fit/aspect come from the saved meta (like handoutInstruction), so the
+  // Cell fit/aspect come from the saved meta (like the instruction), so the
   // editor preview + exported handout match the display's last-saved settings.
   const fit = meta.pictureRound?.fit ?? 'cover';
   const aspect = meta.pictureRound?.aspect ?? '316 / 220';
@@ -939,7 +939,7 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
 
   const onCopy = async () => {
     try {
-      await copyHandoutToClipboard(items, meta.pictureRound.handoutInstruction, handoutOpts);
+      await copyHandoutToClipboard(items, meta.pictureRound.instruction, handoutOpts);
       setStatusFlash('Handout copied to clipboard');
     } catch (e) {
       setStatusFlash(`Copy failed: ${e.message}`);
@@ -948,7 +948,7 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
 
   const onDownload = async () => {
     try {
-      await downloadHandoutPng(items, meta.pictureRound.handoutInstruction, 'picture-round-handout.png', handoutOpts);
+      await downloadHandoutPng(items, meta.pictureRound.instruction, 'picture-round-handout.png', handoutOpts);
       setStatusFlash('Handout PNG downloaded');
     } catch (e) {
       setStatusFlash(`Download failed: ${e.message}`);

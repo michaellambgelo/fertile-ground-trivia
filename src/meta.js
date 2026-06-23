@@ -36,7 +36,7 @@ export const DEFAULT_META = {
     nextEvent: true,
   },
   pictureRound: {
-    handoutInstruction: "Identify the character, place, ship or creature.",
+    instruction: "Identify the character, place, ship or creature.",
     // How picture cells render: "cover" crops images to fill, "contain"
     // letterboxes the whole image (e.g. a flag round). `aspect` is a key into
     // PICTURE_ASPECTS. Both are runtime-editable in the Picture Round card.
@@ -77,8 +77,12 @@ function withDefaults(parsed) {
     // Explicit, validated pick (like `display`) so a renamed/removed preset
     // degrades to the default instead of breaking the cell layout.
     pictureRound: {
-      handoutInstruction:
-        parsed?.pictureRound?.handoutInstruction ?? DEFAULT_META.pictureRound.handoutInstruction,
+      // Renamed from `handoutInstruction` — it now drives both the handout and
+      // the recap slide. Fall back to the old key so saved decks keep their text.
+      instruction:
+        parsed?.pictureRound?.instruction
+        ?? parsed?.pictureRound?.handoutInstruction
+        ?? DEFAULT_META.pictureRound.instruction,
       fit: PICTURE_FITS.includes(parsed?.pictureRound?.fit)
         ? parsed.pictureRound.fit
         : DEFAULT_META.pictureRound.fit,
