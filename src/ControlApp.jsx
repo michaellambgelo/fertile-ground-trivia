@@ -168,7 +168,7 @@ function Header({ tab, setTab, currentSlide, pictureRoundEnabled = true }) {
         fontSize: 12, color: COLORS.accent, whiteSpace: 'nowrap' }}>
         ★ Trivia Control
       </div>
-      <nav style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      <nav style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
         {tabs.map((t) => (
           <button key={t.id}
             onClick={() => { if (!t.disabled) setTab(t.id); }}
@@ -186,6 +186,31 @@ function Header({ tab, setTab, currentSlide, pictureRoundEnabled = true }) {
             {t.label}
           </button>
         ))}
+        {/* Quick link: pop the display (no #/control hash) into a new tab —
+            the window you drag to the TV. Same pathname keeps the Pages
+            subpath base intact in dev and prod. */}
+        <a
+          href={`${window.location.pathname}${window.location.search}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open the display in a new tab"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 14px', borderRadius: 6,
+            border: `1px solid ${COLORS.border}`,
+            color: COLORS.accent, textDecoration: 'none',
+            fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+            whiteSpace: 'nowrap',
+          }}>
+          Display
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+        </a>
       </nav>
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 14, alignItems: 'center',
         fontSize: 12, color: COLORS.textDim, flexWrap: 'wrap', minWidth: 0 }}>
