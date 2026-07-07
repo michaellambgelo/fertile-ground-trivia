@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS,
   loadTiebreakers, saveTiebreakers, resetTiebreakers, DEFAULT_TIEBREAKERS,
-  buildQuestionsExport, parseImport, buildCsvTemplate, buildQuestionsCsv,
+  buildQuestionsExport, parseImport, buildCsvTemplate,
   recapSplitsFor, normalizeQuestion, displayRoundNumber,
   renumberRounds, makeBlankRound, deriveKicker, isAutoKicker,
 } from './rounds.js';
@@ -510,13 +510,6 @@ function EditorPanel({ rounds, tiebreakers, meta, pastes, commitRounds, commitTi
     downloadFile(`trivia-deck-${date}.json`, JSON.stringify(payload, null, 2), 'application/json');
   };
 
-  // CSV export drops per-question media fields (audio/image/video/hint) —
-  // JSON is the lossless format.
-  const onExportCsv = () => {
-    const date = new Date().toISOString().slice(0, 10);
-    downloadFile(`trivia-questions-${date}.csv`, buildQuestionsCsv(draft, draftTiebreakers), 'text/csv');
-  };
-
   const onDownloadTemplate = () => {
     downloadFile('trivia-questions-template.csv', buildCsvTemplate(), 'text/csv');
   };
@@ -608,7 +601,6 @@ function EditorPanel({ rounds, tiebreakers, meta, pastes, commitRounds, commitTi
         <Button onClick={reset} secondary>Reset to Defaults</Button>
         <span style={{ width: 1, height: 24, background: COLORS.border, margin: '0 4px' }} />
         <Button onClick={onExport}>Export Deck</Button>
-        <Button onClick={onExportCsv}>Export CSV</Button>
         <Button onClick={onImportClick}>Import…</Button>
         <Button onClick={onDownloadTemplate} secondary>CSV Template</Button>
         <input

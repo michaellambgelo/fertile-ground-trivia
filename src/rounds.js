@@ -1,7 +1,7 @@
 // Round / question content. Default values + localStorage persistence.
 // Edits made in the /control window save here; both windows read from here.
 
-import { parseCsv, serializeCsv } from './csv.js';
+import { parseCsv } from './csv.js';
 
 const STORAGE_KEY = 'pub-trivia-scaffold.rounds';
 const TIEBREAKER_STORAGE_KEY = 'pub-trivia-scaffold.tiebreakers';
@@ -355,25 +355,6 @@ export function parseQuestionsCsv(text) {
 // tiebreaker rows (exactly TIEBREAKER_COUNT when present).
 // CSV cannot carry audioUrl/imageUrl/videoUrl/displayHint — JSON export is
 // the lossless format.
-
-export function buildQuestionsCsv(rounds, tiebreakers) {
-  const rows = [['round', 'round_title', 'question', 'answer', 'subtitle', 'kicker']];
-  rounds.forEach((r, ri) => {
-    r.questions.forEach((q, qi) => {
-      const { prompt, answer } = normalizeQuestion(q);
-      rows.push([
-        ri + 1,
-        qi === 0 ? r.title : '',
-        prompt,
-        answer || '',
-        qi === 0 ? r.subtitle : '',
-        qi === 0 ? r.kicker : '',
-      ]);
-    });
-  });
-  tiebreakers.forEach((t) => rows.push(['TB', '', t, '', '', '']));
-  return serializeCsv(rows);
-}
 
 export function parseQuestionsFullCsv(text) {
   const rows = cleanCsvRows(text);

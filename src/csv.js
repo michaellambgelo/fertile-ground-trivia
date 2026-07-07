@@ -1,5 +1,6 @@
-// Minimal CSV parse/serialize. Quote-aware state machine — handles quoted
-// fields, doubled quotes, embedded commas and newlines. No dependencies.
+// Minimal CSV parser. Quote-aware state machine — handles quoted fields,
+// doubled quotes, embedded commas and newlines. No dependencies.
+// (Import-only: the deck exports as the JSON bundle, never CSV.)
 
 export function parseCsv(text) {
   // Excel exports often lead with a UTF-8 BOM; strip it so the first header
@@ -28,12 +29,4 @@ export function parseCsv(text) {
   }
   if (field.length > 0 || cur.length > 0) { cur.push(field); rows.push(cur); }
   return rows;
-}
-
-export function serializeCsv(rows) {
-  const cell = (value) => {
-    const s = value == null ? '' : String(value);
-    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  return rows.map((row) => row.map(cell).join(',')).join('\n') + '\n';
 }
