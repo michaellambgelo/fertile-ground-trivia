@@ -500,10 +500,14 @@ function EditorPanel({ rounds, tiebreakers, meta, pastes, commitRounds, commitTi
 
   // Full deck bundle: questions + tiebreakers + picture round (data URLs
   // included) + game meta. One file moves the whole event between machines;
-  // import it on the venue machine to restore everything.
+  // import it on the venue machine to restore everything. An empty paste
+  // buffer exports NO pictures section at all (rather than ten null cells);
+  // when at least one image exists the full 10-slot array ships, since the
+  // null entries are positional — they keep images in the right cells.
   const onExport = () => {
+    const hasPictures = pastes.some((p) => p.dataUrl);
     const payload = buildQuestionsExport(draft, draftTiebreakers, {
-      pictures: pastes,
+      ...(hasPictures ? { pictures: pastes } : {}),
       meta: draftMeta,
     });
     const date = new Date().toISOString().slice(0, 10);
