@@ -293,13 +293,15 @@ function TitleSlide({ accent, title }) {
               {t.edition}
             </div>
           )}
-          <div style={{
-            fontFamily: displayFont, fontWeight: 600, fontSize: 64, lineHeight: 1,
-            letterSpacing: "0.34em", textTransform: "uppercase", color: accent.hex,
-            whiteSpace: "nowrap",
-          }}>
-            TRIVIA NIGHT
-          </div>
+          {t.tagline && (
+            <div style={{
+              fontFamily: displayFont, fontWeight: 600, fontSize: 64, lineHeight: 1,
+              letterSpacing: "0.34em", textTransform: "uppercase", color: accent.hex,
+              whiteSpace: "nowrap",
+            }}>
+              {t.tagline}
+            </div>
+          )}
 
           <div style={{ margin: "56px 0 40px" }}>
             <AccentBar accentHex={PALETTE.rust} />

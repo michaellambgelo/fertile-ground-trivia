@@ -14,9 +14,14 @@ export const DEFAULT_META = {
     // Blank by default — the design leads with the edition hero. Slides
     // uppercase via CSS, so store display case here.
     hero: "",
-    edition: "General Trivia",
+    edition: "Taproom Trivia",
+    // Gold line under the edition hero. Defaults follow the trivia-scorer
+    // production naming ("Fertile Ground Taproom Trivia" → Summer Series /
+    // Autumn Series); hosts append the event number per night ("Summer
+    // Series #2").
+    tagline: "Summer Series",
     hosts: "Jack Smith · Michael Lamb",
-    footerDate: "May 4 · 2026",
+    footerDate: "July 7 · 2026",
   },
   end: {
     hero1: "Thanks For",

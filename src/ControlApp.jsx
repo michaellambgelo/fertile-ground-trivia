@@ -703,6 +703,7 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
         <Field label="Eyebrow" value={draftMeta.title.eyebrow} onChange={(v) => updateMeta('title', 'eyebrow', v)} />
         <Field label="Hero" value={draftMeta.title.hero} onChange={(v) => updateMeta('title', 'hero', v)} />
         <Field label="Edition" value={draftMeta.title.edition} onChange={(v) => updateMeta('title', 'edition', v)} />
+        <Field label="Tagline" value={draftMeta.title.tagline} onChange={(v) => updateMeta('title', 'tagline', v)} />
         <Field label="Hosts" value={draftMeta.title.hosts} onChange={(v) => updateMeta('title', 'hosts', v)} />
         <Field label="Footer" value={draftMeta.title.footerDate} onChange={(v) => updateMeta('title', 'footerDate', v)} />
       </Card>

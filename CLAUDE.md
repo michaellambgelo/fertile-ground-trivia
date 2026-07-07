@@ -84,7 +84,7 @@ The two windows talk via `BroadcastChannel` (channel name `pub-trivia-scaffold` 
 
 | File | Anchor (scaffold value) | Slot |
 |---|---|---|
-| `index.html` | `<title>Trivia Night · Fertile Ground</title>` | `<title>` |
+| `index.html` | `<title>Taproom Trivia · Fertile Ground</title>` | `<title>` |
 | `src/broadcast.js` | `'pub-trivia-scaffold'` (CHANNEL_NAME) | BroadcastChannel name |
 | `src/rounds.js` | `'pub-trivia-scaffold.rounds'` / `'pub-trivia-scaffold.tiebreakers'` | localStorage keys |
 | `src/rounds.js` | `'pub-trivia-scaffold/questions'` | export type |
@@ -93,12 +93,11 @@ The two windows talk via `BroadcastChannel` (channel name `pub-trivia-scaffold` 
 | `src/rounds.js` | full `DEFAULT_TIEBREAKERS` array (real numeric prompts + answer comment) | tiebreaker content |
 | `src/pictures.js` | `'pub-trivia-scaffold.pictures'` | localStorage key |
 | `src/meta.js` | `'pub-trivia-scaffold.meta'` | localStorage key |
-| `src/meta.js` `DEFAULT_META.title` | `eyebrow`, `hero` (blank by default — optional line, rendered only when non-empty), `edition`, `hosts`, `footerDate` | title slide defaults — host can override at runtime via Edit Questions tab |
+| `src/meta.js` `DEFAULT_META.title` | `eyebrow`, `hero` (blank by default — optional line, rendered only when non-empty), `edition` (`"Taproom Trivia"`), `tagline` (`"Summer Series"` — gold line under the edition; optional, follows the trivia-scorer series nomenclature, hosts append the event number per night), `hosts`, `footerDate` | title slide defaults — host can override at runtime via Edit Questions tab |
 | `src/meta.js` `DEFAULT_META.end` | `hero1`, `hero2`, `subtitle` | end slide defaults — host can override at runtime |
 | `src/meta.js` `DEFAULT_META.nextEvent` | `eyebrow`, `hero`, `date`, `venue`, `detail` | next-event slide defaults — theme only if a fitting metaphor exists; host edits per event |
 | `src/meta.js` `DEFAULT_META.pictureRound` | `fit` (`'cover'`/`'contain'`) + `aspect` (`PICTURE_ASPECTS` key) | picture-cell defaults — a flag-style sibling can ship `fit: 'contain', aspect: '3 / 2'`; host can also flip at runtime via the Picture Round card |
 | `src/slides.jsx` | full `PALETTE` object values (7 keys — `ink`/`inkDeep`/`paper`/`paperDim`/`rust`/`rustDeep`/`gold`; keys stay) | palette |
-| `src/slides.jsx` TitleSlide | `TRIVIA NIGHT` (64px tagline under the edition hero, hardcoded) — the HERO / EDITION strings live in `meta.js` defaults | title slide |
 | `src/slides.jsx` RulesSlide | rules I–IV `d` text | rules |
 | `src/slides.jsx` CostumeContestSlide | rule I–IV body copy | costume contest |
 | `src/slides.jsx` PictureRoundInstructions | step 03 `d` text | picture-round instructions |
