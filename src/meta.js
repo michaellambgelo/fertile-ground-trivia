@@ -10,20 +10,28 @@ const STORAGE_KEY = 'pub-trivia-scaffold.meta';
 export const DEFAULT_META = {
   title: {
     eyebrow: "Presented at Fertile Ground",
-    hero: "WELCOME",
-    edition: "GENERAL TRIVIA",
+    // Optional secondary line between the eyebrow and the edition name.
+    // Blank by default — the design leads with the edition hero. Slides
+    // uppercase via CSS, so store display case here.
+    hero: "",
+    edition: "Taproom Trivia",
+    // Gold line under the edition hero. Defaults follow the trivia-scorer
+    // production naming ("Fertile Ground Taproom Trivia" → Summer Series /
+    // Autumn Series); hosts append the event number per night ("Summer
+    // Series #2").
+    tagline: "Summer Series",
     hosts: "Jack Smith · Michael Lamb",
-    footerDate: "May 4 · 2026",
+    footerDate: "July 7 · 2026",
   },
   end: {
-    hero1: "THANKS FOR",
-    hero2: "PLAYING.",
-    subtitle: "HOSTS TALLYING SCORES · STAND BY",
+    hero1: "Thanks For",
+    hero2: "Playing.",
+    subtitle: "Hosts Tallying Scores · Stand By",
   },
   // Next-event announcement slide (after End, before tiebreakers).
   nextEvent: {
     eyebrow: "Before You Go",
-    hero: "NEXT TRIVIA NIGHT",
+    hero: "Next Trivia Night",
     date: "TBA",
     venue: "Fertile Ground",
     detail: "Same teams welcome back. Bring a friend.",
@@ -96,6 +104,12 @@ function withDefaults(parsed) {
       timerSeconds: display.timerSeconds ?? DEFAULT_META.display.timerSeconds,
     },
   };
+}
+
+// Coerce an untrusted meta object (imported deck bundle) to the current
+// schema — same merge/validation path persisted saves go through.
+export function sanitizeMeta(parsed) {
+  return withDefaults(parsed);
 }
 
 export function loadMeta() {

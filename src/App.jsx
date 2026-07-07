@@ -27,7 +27,7 @@ const ROUND_ACCENTS = {
   // 5: "accent-gold",
 };
 // Global accent — themed forks set this to their signature ACCENTS key.
-const DEFAULT_ACCENT = "accent-red";
+const DEFAULT_ACCENT = "accent-gold";
 function accentFor(n, global) {
   return ACCENTS[ROUND_ACCENTS[n]] || global;
 }

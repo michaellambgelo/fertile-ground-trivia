@@ -2,17 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   loadRounds, saveRounds, resetRounds, DEFAULT_ROUNDS,
   loadTiebreakers, saveTiebreakers, resetTiebreakers, DEFAULT_TIEBREAKERS,
-  buildQuestionsExport, parseImport, buildCsvTemplate, buildQuestionsCsv,
+  buildQuestionsExport, parseImport, buildCsvTemplate,
   recapSplitsFor, normalizeQuestion, displayRoundNumber,
   renumberRounds, makeBlankRound, deriveKicker, isAutoKicker,
 } from './rounds.js';
-import { loadMeta, saveMeta, resetMeta, DEFAULT_META } from './meta.js';
+import { loadMeta, saveMeta, resetMeta, sanitizeMeta, DEFAULT_META } from './meta.js';
 import {
-  loadPastes, savePastes, clearPastes, mergeItems, PICTURE_FILENAME,
+  loadPastes, savePastes, clearPastes, mergeItems, normalizePastes, ingestImage,
   PICTURE_ASPECTS, resolveAspect,
 } from './pictures.js';
 import {
-  copyHandoutToClipboard, downloadHandoutPng, downloadAllImages, downloadAnswersHandoutPng,
+  copyHandoutToClipboard, downloadHandoutPng, downloadAnswersHandoutPng,
 } from './handout.js';
 import { broadcast, useBroadcast } from './broadcast.js';
 
@@ -34,7 +34,7 @@ const COLORS = {
 
 const baseStyle = {
   margin: 0, minHeight: '100vh', background: COLORS.bg, color: COLORS.text,
-  fontFamily: 'Inter, system-ui, sans-serif', fontSize: 14, lineHeight: 1.4,
+  fontFamily: "'Work Sans', system-ui, sans-serif", fontSize: 14, lineHeight: 1.4,
 };
 
 // Track viewport width so layouts can stack at narrow widths (split-tab use,
@@ -85,10 +85,13 @@ export default function ControlApp() {
     broadcast('meta:update', next);
   }, []);
 
+  // Broadcast BEFORE persisting: if the localStorage write fails (quota),
+  // the display still gets the images for this session. Returns the save
+  // result so panels can warn that the buffer won't survive a reload.
   const commitPastes = useCallback((next) => {
     setPastes(next);
-    savePastes(next);
     broadcast('pictures:update', next);
+    return savePastes(next);
   }, []);
 
   // Listen for slide / timer state coming back from the display window.
@@ -126,9 +129,11 @@ export default function ControlApp() {
           rounds={rounds}
           tiebreakers={tiebreakers}
           meta={meta}
+          pastes={pastes}
           commitRounds={commitRounds}
           commitTiebreakers={commitTiebreakers}
           commitMeta={commitMeta}
+          commitPastes={commitPastes}
         />
       )}
       {tab === 'pictures' && pictureRoundEnabled && (
@@ -344,12 +349,13 @@ function SlideList({ slideList, currentIndex, narrow }) {
 // ============================================================
 // EDITOR PANEL — long form, edit metadata + questions
 // ============================================================
-function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreakers, commitMeta }) {
+function EditorPanel({ rounds, tiebreakers, meta, pastes, commitRounds, commitTiebreakers, commitMeta, commitPastes }) {
   const [draft, setDraft] = useState(rounds);
   const [draftTiebreakers, setDraftTiebreakers] = useState(tiebreakers);
   const [draftMeta, setDraftMeta] = useState(meta);
   const [dirty, setDirty] = useState(false);
   const [csvImport, setCsvImport] = useState(null);
+  const [importNote, setImportNote] = useState('');
   const fileInputRef = useRef(null);
 
   // If the persisted data changes externally (e.g. another window saved), pull
@@ -454,12 +460,14 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
     commitTiebreakers(draftTiebreakers);
     commitMeta(draftMeta);
     setDirty(false);
+    setImportNote('');
   };
   const revert = () => {
     setDraft(rounds);
     setDraftTiebreakers(tiebreakers);
     setDraftMeta(meta);
     setDirty(false);
+    setImportNote('');
   };
   const reset = () => {
     if (!confirm('Reset all questions, tiebreakers, and slide settings to the default General Trivia content? This will discard your edits.')) return;
@@ -490,17 +498,16 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
     URL.revokeObjectURL(url);
   };
 
+  // Full deck bundle: questions + tiebreakers + picture round (data URLs
+  // included) + game meta. One file moves the whole event between machines;
+  // import it on the venue machine to restore everything.
   const onExport = () => {
-    const payload = buildQuestionsExport(draft, draftTiebreakers);
+    const payload = buildQuestionsExport(draft, draftTiebreakers, {
+      pictures: pastes,
+      meta: draftMeta,
+    });
     const date = new Date().toISOString().slice(0, 10);
-    downloadFile(`trivia-questions-${date}.json`, JSON.stringify(payload, null, 2), 'application/json');
-  };
-
-  // CSV export drops per-question media fields (audio/image/video/hint) —
-  // JSON is the lossless format.
-  const onExportCsv = () => {
-    const date = new Date().toISOString().slice(0, 10);
-    downloadFile(`trivia-questions-${date}.csv`, buildQuestionsCsv(draft, draftTiebreakers), 'text/csv');
+    downloadFile(`trivia-deck-${date}.json`, JSON.stringify(payload, null, 2), 'application/json');
   };
 
   const onDownloadTemplate = () => {
@@ -520,7 +527,21 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
         if (result.kind === 'json') {
           setDraft(result.rounds);
           setDraftTiebreakers(result.tiebreakers);
+          if (result.meta) setDraftMeta(sanitizeMeta(result.meta));
           setDirty(true);
+          // Pictures have no draft stage — the Picture Round panel always
+          // commits live — so a bundle's pictures land immediately while the
+          // question/meta edits above wait for Save & Push.
+          if (result.pictures) {
+            const restored = normalizePastes(result.pictures);
+            const saved = commitPastes(restored);
+            const count = restored.filter((p) => p.dataUrl).length;
+            setImportNote(
+              `Deck imported — ${count} picture${count === 1 ? '' : 's'} restored${saved ? '' : ' (storage full: pictures won’t survive a reload)'}. Review, then Save & Push.`
+            );
+          } else {
+            setImportNote('Questions imported. Review, then Save & Push.');
+          }
         } else if (result.kind === 'csv-full') {
           setDraft(result.rounds);
           if (result.tiebreakers) setDraftTiebreakers(result.tiebreakers);
@@ -579,8 +600,7 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
         <Button onClick={revert} disabled={!dirty}>Revert</Button>
         <Button onClick={reset} secondary>Reset to Defaults</Button>
         <span style={{ width: 1, height: 24, background: COLORS.border, margin: '0 4px' }} />
-        <Button onClick={onExport}>Export JSON</Button>
-        <Button onClick={onExportCsv}>Export CSV</Button>
+        <Button onClick={onExport}>Export Deck</Button>
         <Button onClick={onImportClick}>Import…</Button>
         <Button onClick={onDownloadTemplate} secondary>CSV Template</Button>
         <input
@@ -591,6 +611,7 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
           style={{ display: 'none' }}
         />
         {dirty && <span style={{ color: COLORS.warn, fontSize: 12 }}>Unsaved changes</span>}
+        {importNote && <span style={{ color: COLORS.accent, fontSize: 12 }}>{importNote}</span>}
       </div>
 
       <Card title="Slides to Include">
@@ -703,6 +724,7 @@ function EditorPanel({ rounds, tiebreakers, meta, commitRounds, commitTiebreaker
         <Field label="Eyebrow" value={draftMeta.title.eyebrow} onChange={(v) => updateMeta('title', 'eyebrow', v)} />
         <Field label="Hero" value={draftMeta.title.hero} onChange={(v) => updateMeta('title', 'hero', v)} />
         <Field label="Edition" value={draftMeta.title.edition} onChange={(v) => updateMeta('title', 'edition', v)} />
+        <Field label="Tagline" value={draftMeta.title.tagline} onChange={(v) => updateMeta('title', 'tagline', v)} />
         <Field label="Hosts" value={draftMeta.title.hosts} onChange={(v) => updateMeta('title', 'hosts', v)} />
         <Field label="Footer" value={draftMeta.title.footerDate} onChange={(v) => updateMeta('title', 'footerDate', v)} />
       </Card>
@@ -879,42 +901,45 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
     setTimeout(() => setStatus((s) => (s === msg ? '' : s)), 2400);
   }, []);
 
+  // Commit + surface a persistence failure. The display still shows the
+  // image this session (commitPastes broadcasts before saving); the warning
+  // is about the buffer not surviving a reload.
+  const commitChecked = useCallback((next, okMsg) => {
+    const saved = commitPastes(next);
+    setStatusFlash(saved ? okMsg : `${okMsg} — but storage is full, so it won’t survive a reload. Clear unused cells.`);
+  }, [commitPastes, setStatusFlash]);
+
+  // ingestImage downscales + re-encodes so ten photos fit the localStorage
+  // quota; crop position resets so old framing doesn't carry over.
+  const loadIntoCell = useCallback(async (i, blob, verb) => {
+    try {
+      const dataUrl = await ingestImage(blob);
+      const next = pastes.map((p, idx) =>
+        idx === i ? { ...p, dataUrl, position: { x: 50, y: 50 } } : p
+      );
+      commitChecked(next, `${verb} cell ${String(i + 1).padStart(2, '0')}`);
+    } catch (e) {
+      setStatusFlash(`Image failed to load: ${e.message}`);
+    }
+  }, [pastes, commitChecked, setStatusFlash]);
+
   const handlePaste = useCallback((i, e) => {
     const clipItems = e.clipboardData?.items || [];
     for (const item of clipItems) {
       if (item.type.startsWith('image/')) {
         e.preventDefault();
-        const blob = item.getAsFile();
-        const reader = new FileReader();
-        reader.onload = () => {
-          // Reset crop position when a new image lands so old framing
-          // doesn't carry over to the new picture.
-          const next = pastes.map((p, idx) =>
-            idx === i ? { ...p, dataUrl: reader.result, position: { x: 50, y: 50 } } : p
-          );
-          commitPastes(next);
-          setStatusFlash(`Pasted into cell ${String(i + 1).padStart(2, '0')}`);
-        };
-        reader.readAsDataURL(blob);
+        loadIntoCell(i, item.getAsFile(), 'Pasted into');
         return;
       }
     }
-  }, [pastes, commitPastes, setStatusFlash]);
+  }, [loadIntoCell]);
 
   const handleDrop = useCallback((i, e) => {
     e.preventDefault();
     const file = e.dataTransfer?.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const next = pastes.map((p, idx) =>
-        idx === i ? { ...p, dataUrl: reader.result, position: { x: 50, y: 50 } } : p
-      );
-      commitPastes(next);
-      setStatusFlash(`Loaded image into cell ${String(i + 1).padStart(2, '0')}`);
-    };
-    reader.readAsDataURL(file);
-  }, [pastes, commitPastes, setStatusFlash]);
+    loadIntoCell(i, file, 'Loaded image into');
+  }, [loadIntoCell]);
 
   const setCellPosition = useCallback((i, position) => {
     const next = pastes.map((p, idx) =>
@@ -955,16 +980,6 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
     }
   };
 
-  const onSaveImages = async () => {
-    try {
-      const count = await downloadAllImages(items);
-      if (count === 0) setStatusFlash('No images to save — paste some first');
-      else setStatusFlash(`Downloaded ${count} image${count === 1 ? '' : 's'} → drop into public/images/`);
-    } catch (e) {
-      setStatusFlash(`Save failed: ${e.message}`);
-    }
-  };
-
   const onDownloadAnswers = async () => {
     try {
       // One sheet covers every round: line count follows the longest round.
@@ -975,28 +990,14 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
     }
   };
 
-  // Cmd/Ctrl+S → Save Images to Disk (the labeled "Save" action on this tab).
-  const onSaveImagesRef = useRef(onSaveImages);
-  onSaveImagesRef.current = onSaveImages;
-  useEffect(() => {
-    const onKey = (e) => {
-      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
-      if (e.key !== 's' && e.key !== 'S') return;
-      e.preventDefault();
-      onSaveImagesRef.current();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Card title="Picture Round — paste images, then export">
         <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 14 }}>
           Click a cell to focus it, then ⌘V (Mac) / Ctrl+V to paste an image. Or drag-drop a file.
           Once an image is in a cell, <strong>drag the image</strong> to crop / re-frame it; the ↺ button resets the crop.
-          Pastes live in <code>localStorage</code>; click <strong>Save Images to Disk</strong> when done
-          to download them as <code>{PICTURE_FILENAME(0)}</code> … and drop them into <code>public/images/</code>.
+          Images are stored in this browser; <strong>Export Deck</strong> (Edit Questions tab) bundles them
+          with the questions into one file you can import on another machine.
         </div>
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12,
@@ -1024,7 +1025,6 @@ function PicturesPanel({ pastes, commitPastes, meta, rounds = [] }) {
         <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <Button onClick={onCopy} primary>Copy Handout to Clipboard</Button>
           <Button onClick={onDownload}>Download Handout PNG</Button>
-          <Button onClick={onSaveImages}>Save Images to Disk</Button>
           <Button onClick={onDownloadAnswers}>Download Answers Handout</Button>
           <Button onClick={clearAll} secondary>Clear All</Button>
           {status && (
@@ -1045,11 +1045,15 @@ function PictureCell({
   const ref = useRef(null);
   const [diskFailed, setDiskFailed] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // Live crop position while dragging — local-only so the (expensive)
+  // persist + broadcast happens once on pointer-up, not per mouse move.
+  const [livePos, setLivePos] = useState(null);
   const showSrc = dataUrl || (!diskFailed ? fallbackSrc : null);
   // Cropping only makes sense in "cover"; "contain" letterboxes the whole
   // image, so panning + the reset button are disabled there.
   const canPan = fit === 'cover';
-  const isPositioned = (position?.x ?? 50) !== 50 || (position?.y ?? 50) !== 50;
+  const shownPos = livePos ?? { x: position?.x ?? 50, y: position?.y ?? 50 };
+  const isPositioned = shownPos.x !== 50 || shownPos.y !== 50;
 
   // Drag-to-pan: when an image is loaded, holding pointer down and dragging
   // shifts the visible crop. We translate pixel deltas into objectPosition
@@ -1063,6 +1067,7 @@ function PictureCell({
     const startX = e.clientX, startY = e.clientY;
     const startPos = { x: position?.x ?? 50, y: position?.y ?? 50 };
     let moved = false;
+    let last = null;
     const onMove = (e2) => {
       const dx = e2.clientX - startX;
       const dy = e2.clientY - startY;
@@ -1071,12 +1076,15 @@ function PictureCell({
       setDragging(true);
       const nx = clamp(startPos.x - (dx / rect.width) * 100, 0, 100);
       const ny = clamp(startPos.y - (dy / rect.height) * 100, 0, 100);
-      onPositionChange({ x: nx, y: ny });
+      last = { x: nx, y: ny };
+      setLivePos(last);
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       setDragging(false);
+      setLivePos(null);
+      if (moved && last) onPositionChange(last);   // single commit per drag
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -1108,7 +1116,7 @@ function PictureCell({
           onError={() => { if (!isPasted) setDiskFailed(true); }}
           style={{
             width: '100%', height: '100%', objectFit: fit, display: 'block',
-            objectPosition: canPan ? `${position?.x ?? 50}% ${position?.y ?? 50}%` : 'center',
+            objectPosition: canPan ? `${shownPos.x}% ${shownPos.y}%` : 'center',
             pointerEvents: 'none',  // pointer events go to the cell so drag works
           }}
         />

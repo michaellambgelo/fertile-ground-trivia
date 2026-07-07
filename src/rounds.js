@@ -1,7 +1,7 @@
 // Round / question content. Default values + localStorage persistence.
 // Edits made in the /control window save here; both windows read from here.
 
-import { parseCsv, serializeCsv } from './csv.js';
+import { parseCsv } from './csv.js';
 
 const STORAGE_KEY = 'pub-trivia-scaffold.rounds';
 const TIEBREAKER_STORAGE_KEY = 'pub-trivia-scaffold.tiebreakers';
@@ -197,22 +197,28 @@ export function isAutoKicker(kicker) {
 }
 
 // ---- Export / import ------------------------------------------------------
-// Round content + tiebreakers serialize to a single JSON file so a host can
-// back up before clicking Reset, restore after a wipe, or move questions
-// between machines. Pictures intentionally not included — they're handled
-// by the Save Images to Disk flow on the Picture Round panel.
+// The whole deck serializes to a single JSON file so a host can back up
+// before clicking Reset, restore after a wipe, or move an event between
+// machines. Version 2 adds the optional deck-bundle sections: `pictures`
+// (the 10-slot picture-round buffer, data URLs included) and `meta` (full
+// game meta). Version 1 files (questions + tiebreakers only) still import.
 
 export const QUESTIONS_EXPORT_TYPE = 'pub-trivia-scaffold/questions';
-export const QUESTIONS_EXPORT_VERSION = 1;
+export const QUESTIONS_EXPORT_VERSION = 2;
 
-export function buildQuestionsExport(rounds, tiebreakers) {
-  return {
+// `extras` carries the optional bundle sections: pass { pictures, meta } to
+// export a complete deck as one file; omit for a questions-only export.
+export function buildQuestionsExport(rounds, tiebreakers, extras = {}) {
+  const payload = {
     type: QUESTIONS_EXPORT_TYPE,
     version: QUESTIONS_EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
     rounds: clone(rounds),
     tiebreakers: [...tiebreakers],
   };
+  if (extras.pictures) payload.pictures = extras.pictures;
+  if (extras.meta) payload.meta = extras.meta;
+  return payload;
 }
 
 export function parseQuestionsImport(text) {
@@ -251,10 +257,26 @@ export function parseQuestionsImport(text) {
   if (data.tiebreakers.length !== TIEBREAKER_COUNT) {
     throw new Error(`"tiebreakers" must contain exactly ${TIEBREAKER_COUNT} entries.`);
   }
-  return {
+  const result = {
     rounds: clone(data.rounds),
     tiebreakers: [...data.tiebreakers],
   };
+  // Optional version-2 deck-bundle sections. Passed through loosely here —
+  // the importer runs pictures through normalizePastes and meta through
+  // sanitizeMeta, which coerce shape and drop garbage fields.
+  if (data.pictures !== undefined) {
+    if (!Array.isArray(data.pictures)) {
+      throw new Error('"pictures" must be an array when present.');
+    }
+    result.pictures = data.pictures;
+  }
+  if (data.meta !== undefined) {
+    if (!data.meta || typeof data.meta !== 'object' || Array.isArray(data.meta)) {
+      throw new Error('"meta" must be an object when present.');
+    }
+    result.meta = data.meta;
+  }
+  return result;
 }
 
 // ---- CSV writer template + import ---------------------------------------
@@ -333,25 +355,6 @@ export function parseQuestionsCsv(text) {
 // tiebreaker rows (exactly TIEBREAKER_COUNT when present).
 // CSV cannot carry audioUrl/imageUrl/videoUrl/displayHint — JSON export is
 // the lossless format.
-
-export function buildQuestionsCsv(rounds, tiebreakers) {
-  const rows = [['round', 'round_title', 'question', 'answer', 'subtitle', 'kicker']];
-  rounds.forEach((r, ri) => {
-    r.questions.forEach((q, qi) => {
-      const { prompt, answer } = normalizeQuestion(q);
-      rows.push([
-        ri + 1,
-        qi === 0 ? r.title : '',
-        prompt,
-        answer || '',
-        qi === 0 ? r.subtitle : '',
-        qi === 0 ? r.kicker : '',
-      ]);
-    });
-  });
-  tiebreakers.forEach((t) => rows.push(['TB', '', t, '', '', '']));
-  return serializeCsv(rows);
-}
 
 export function parseQuestionsFullCsv(text) {
   const rows = cleanCsvRows(text);

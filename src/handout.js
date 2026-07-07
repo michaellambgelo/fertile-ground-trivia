@@ -1,11 +1,10 @@
 // Render the picture round as a print-friendly PNG (light background, dark
 // borders, no atmosphere overlays, no "Recap" eyebrow). Handles copy-to-
-// clipboard, file download, and per-image download for the "save to disk"
-// workflow.
+// clipboard and file download.
 //
 // Drawn directly on a 2D canvas — no html2canvas dependency, no DOM clones.
 
-import { PICTURE_FILENAME, DEFAULT_ASPECT, pictureGridLayout } from './pictures.js';
+import { DEFAULT_ASPECT, pictureGridLayout } from './pictures.js';
 
 // Fallback instruction line printed under the handout title. Callers (the
 // control window) pass the per-game value from meta.pictureRound; this keeps
@@ -80,9 +79,9 @@ export async function renderHandoutCanvas(items, instruction = DEFAULT_HANDOUT_I
   ctx.fillRect((W - ruleW) / 2, RULE_Y, ruleW, 3);
 
   // Instruction line — what contestants are doing. Left-aligned to match the
-  // slide layout (italic Inter body text under the accent rule).
+  // slide layout (italic Work Sans body text under the accent rule).
   ctx.fillStyle = '#54514A';
-  ctx.font = `italic 500 36px 'Inter', system-ui, sans-serif`;
+  ctx.font = `italic 500 36px 'Work Sans', system-ui, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(instruction, MARGIN_X, INSTRUCTION_Y);
@@ -293,34 +292,6 @@ function measureLabel(ctx, label) {
   const w = ctx.measureText(label).width;
   ctx.font = prevFont;
   return w;
-}
-
-// Download each pasted image individually with the predictable picture-NN.png
-// names so the user can drop them into public/images/. Skips empty cells.
-// Returns the count of files downloaded.
-export async function downloadAllImages(items) {
-  let count = 0;
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (!item.src) continue;
-    const blob = await fetchAsBlob(item.src);
-    if (!blob) continue;
-    triggerDownload(blob, PICTURE_FILENAME(i));
-    count++;
-    // tiny gap so browsers don't suppress repeated downloads
-    await new Promise((r) => setTimeout(r, 80));
-  }
-  return count;
-}
-
-async function fetchAsBlob(src) {
-  try {
-    const res = await fetch(src);
-    if (!res.ok) return null;
-    return await res.blob();
-  } catch {
-    return null;
-  }
 }
 
 function triggerDownload(blob, filename) {
