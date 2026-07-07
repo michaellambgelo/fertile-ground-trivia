@@ -80,9 +80,9 @@ export async function renderHandoutCanvas(items, instruction = DEFAULT_HANDOUT_I
   ctx.fillRect((W - ruleW) / 2, RULE_Y, ruleW, 3);
 
   // Instruction line — what contestants are doing. Left-aligned to match the
-  // slide layout (italic Inter body text under the accent rule).
+  // slide layout (italic Work Sans body text under the accent rule).
   ctx.fillStyle = '#54514A';
-  ctx.font = `italic 500 36px 'Inter', system-ui, sans-serif`;
+  ctx.font = `italic 500 36px 'Work Sans', system-ui, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(instruction, MARGIN_X, INSTRUCTION_Y);

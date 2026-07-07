@@ -34,7 +34,7 @@ const COLORS = {
 
 const baseStyle = {
   margin: 0, minHeight: '100vh', background: COLORS.bg, color: COLORS.text,
-  fontFamily: 'Inter, system-ui, sans-serif', fontSize: 14, lineHeight: 1.4,
+  fontFamily: "'Work Sans', system-ui, sans-serif", fontSize: 14, lineHeight: 1.4,
 };
 
 // Track viewport width so layouts can stack at narrow widths (split-tab use,

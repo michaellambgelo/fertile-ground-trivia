@@ -10,20 +10,23 @@ const STORAGE_KEY = 'pub-trivia-scaffold.meta';
 export const DEFAULT_META = {
   title: {
     eyebrow: "Presented at Fertile Ground",
-    hero: "WELCOME",
-    edition: "GENERAL TRIVIA",
+    // Optional secondary line between the eyebrow and the edition name.
+    // Blank by default — the design leads with the edition hero. Slides
+    // uppercase via CSS, so store display case here.
+    hero: "",
+    edition: "General Trivia",
     hosts: "Jack Smith · Michael Lamb",
     footerDate: "May 4 · 2026",
   },
   end: {
-    hero1: "THANKS FOR",
-    hero2: "PLAYING.",
-    subtitle: "HOSTS TALLYING SCORES · STAND BY",
+    hero1: "Thanks For",
+    hero2: "Playing.",
+    subtitle: "Hosts Tallying Scores · Stand By",
   },
   // Next-event announcement slide (after End, before tiebreakers).
   nextEvent: {
     eyebrow: "Before You Go",
-    hero: "NEXT TRIVIA NIGHT",
+    hero: "Next Trivia Night",
     date: "TBA",
     venue: "Fertile Ground",
     detail: "Same teams welcome back. Bring a friend.",

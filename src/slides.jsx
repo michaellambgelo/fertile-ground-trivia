@@ -4,59 +4,75 @@ import { resolveAspect, pictureGridLayout } from './pictures.js';
 
 // ============================================================
 // DESIGN SYSTEM — Theme-neutral scaffold; clone via /new-pub-trivia-deck and override PALETTE
+// Pulp-poster look: flat solid surfaces, hard offset shadows (no glows),
+// an inset border frame on every slide, and red-background feature slides
+// (Prize, Round Openers, Intermissions).
 // ============================================================
 const TYPE_SCALE = {
-  display: 132,   // hero numerals
-  title: 88,      // section / round titles
-  subtitle: 56,   // q-numbers, secondary headers
-  body: 36,       // question prompts
-  meta: 34,       // labels, eyebrows
-  small: 30,      // captions, footers
+  display: 132,   // hero lines (Alfa Slab One)
+  title: 92,      // section / round titles
+  subtitle: 48,   // rule titles, secondary headers
+  body: 30,       // body copy
+  meta: 30,       // labels, eyebrows
+  small: 26,      // captions, footers
 };
 
 const SPACING = {
   paddingTop: 100,
-  paddingBottom: 90,
+  paddingBottom: 96,
   paddingX: 120,
   titleGap: 48,
   itemGap: 28,
 };
 
 const ACCENTS = {
-  "accent-blue":  { hex: "#1f4e96", glow: "rgba(31, 78, 150, 0.32)", name: "BLUE" },
-  "accent-green": { hex: "#1a6f3c", glow: "rgba(26, 111, 60, 0.32)", name: "GREEN" },
-  "accent-red":   { hex: "#e73826", glow: "rgba(231, 56, 38, 0.35)", name: "RED" },
-  "accent-gold":  { hex: "#a67510", glow: "rgba(166, 117, 16, 0.32)", name: "GOLD" },
+  "accent-blue":  { hex: "#5B8DD9", glow: "rgba(91, 141, 217, 0.32)", name: "BLUE" },
+  "accent-green": { hex: "#4E9A6A", glow: "rgba(78, 154, 106, 0.32)", name: "GREEN" },
+  "accent-red":   { hex: "#C8201E", glow: "rgba(200, 32, 30, 0.35)", name: "RED" },
+  "accent-gold":  { hex: "#E2A828", glow: "rgba(226, 168, 40, 0.32)", name: "GOLD" },
 };
 
 // ⚠️ PALETTE naming convention: `ink` is "the slide background color" and
 // `paper` is "the primary text color" — they are NOT semantic indicators
-// of light vs dark. The scaffold has shipped both light-bg/dark-text
-// (current) and dark-bg/light-text (original) using the same key names.
-// Themed forks invert the VALUES but keep the KEYS.
-// Inline alpha-hex (e.g. `${PALETTE.paper}1F` for ~12% alpha) is used
-// throughout for translucent overlays — Vignette, captions, subtle
-// borders. Search `slides.jsx` for `rgba(` if you ever add new
-// translucency: prefer alpha-hex on a PALETTE token so palette swaps
+// of light vs dark. The scaffold has shipped light-bg/dark-text and
+// dark-bg/light-text (current: navy bg / cream text) using the same key
+// names. Themed forks invert the VALUES but keep the KEYS.
+// `inkDeep` is the near-black outline + hard-shadow token (pulp-poster
+// borders and offset shadows); `rust` is the structural red (rule bars,
+// red-background slides, chips); `rustDeep` is the darker red used for the
+// question-number offset shadow; `gold` is the highlight (the scaffold's
+// DEFAULT_ACCENT points at the matching ACCENTS entry).
+// Inline alpha-hex (e.g. `${PALETTE.paper}47` for ~28% alpha) is used
+// throughout for translucent frames, hairlines, and dimmed text. Prefer
+// alpha-hex on a PALETTE token over literal `rgba(...)` so palette swaps
 // in themed forks track automatically.
 const PALETTE = {
-  ink: "#fafaf7",            // slide background (currently off-white)
-  inkDeep: "#f3f1ec",        // alt surface tint
-  paper: "#0e1c3a",          // primary text color (currently dark navy)
-  paperDim: "#5b6577",       // secondary/muted text
-  rust: "#e73826",           // primary accent red
-  gold: "#a32519",           // secondary accent red
+  ink: "#1A2A4A",            // slide background (navy)
+  inkDeep: "#1A1410",        // outline + hard-shadow near-black
+  paper: "#F2E8CF",          // primary text color (cream)
+  paperDim: "#F2E8CF99",     // secondary/muted text (cream @ 60%)
+  rust: "#C8201E",           // structural red
+  rustDeep: "#9A1716",       // question-number shadow red
+  gold: "#E2A828",           // highlight gold
 };
 
 // ============================================================
 // SHARED STYLE OBJECTS
 // ============================================================
+const displayFont = "'Oswald', 'Bebas Neue', Impact, sans-serif";
+const heroFont = "'Alfa Slab One', 'Oswald', Georgia, serif";
+const bodyFont = "'Work Sans', system-ui, sans-serif";
+
+// Hard offset shadow — the pulp-poster signature. Use for text-shadow and
+// (via the same string) box-shadow.
+const hardShadow = (px, color = PALETTE.inkDeep) => `${px}px ${px}px 0 ${color}`;
+
 const slideBase = {
   width: "100%",
   height: "100%",
   position: "relative",
   overflow: "hidden",
-  fontFamily: "'Inter', system-ui, sans-serif",
+  fontFamily: bodyFont,
   color: PALETTE.paper,
   background: PALETTE.ink,
   display: "flex",
@@ -64,96 +80,44 @@ const slideBase = {
   boxSizing: "border-box",
 };
 
-const displayFont = "'Oswald', 'Bebas Neue', Impact, sans-serif";
-
-// ============================================================
-// BACKGROUND ATMOSPHERE — vignette + halftone + grain
-// ============================================================
-function HalftoneOverlay({ opacity = 0.05 }) {
-  return (
-    <div style={{
-      position: "absolute", inset: 0, pointerEvents: "none",
-      backgroundImage: `radial-gradient(${PALETTE.paper} 1px, transparent 1px)`,
-      backgroundSize: "8px 8px",
-      mixBlendMode: "overlay",
-      opacity,
-    }} />
-  );
-}
-
-function GrainOverlay({ opacity = 0.18 }) {
-  return (
-    <div style={{
-      position: "absolute", inset: 0, pointerEvents: "none",
-      opacity,
-      backgroundImage:
-        `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 0.95  0 0 0 0 0.85  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")`,
-      mixBlendMode: "overlay",
-    }} />
-  );
-}
-
-function Vignette() {
-  return (
-    <div style={{
-      position: "absolute", inset: 0, pointerEvents: "none",
-      background: `radial-gradient(ellipse at center, transparent 55%, ${PALETTE.paper}1F 100%)`,
-    }} />
-  );
-}
-
-function SlideAtmosphere({ tweaks, accent, variant = "dark" }) {
-  // variant: "dark" (default), "paper" (cream)
-  return (
-    <>
-      {variant === "dark" && <HalftoneOverlay opacity={0.04} />}
-      <GrainOverlay opacity={variant === "paper" ? 0.25 : 0.16} />
-      {variant === "dark" && <Vignette />}
-    </>
-  );
-}
+// Slide surface with the red-background variant used by Prize, Round
+// Openers, and Intermissions. `variant` also drives Frame/FooterBar alphas.
+const slideSurface = (variant = "navy") => ({
+  ...slideBase,
+  background: variant === "red" ? PALETTE.rust : PALETTE.ink,
+});
 
 // ============================================================
 // REUSABLE BITS
 // ============================================================
-function CornerMarks({ color = PALETTE.paper, label, accentHex }) {
-  // Pulp-poster corner brackets + tiny label
-  const c = color;
-  const L = 38;
-  const T = 4;
-  const corner = (style) => (
-    <div style={{
-      position: "absolute", width: L, height: L,
-      borderColor: c, borderStyle: "solid", borderWidth: 0,
-      ...style,
-    }} />
-  );
+function Frame({ variant = "navy" }) {
+  // Inset border frame drawn on every slide. Red slides get a stronger
+  // alpha so the frame stays visible against the saturated background.
   return (
-    <>
-      <div style={{ position: "absolute", top: 36, left: 36, width: L, height: L,
-        borderTop: `${T}px solid ${c}`, borderLeft: `${T}px solid ${c}` }} />
-      <div style={{ position: "absolute", top: 36, right: 36, width: L, height: L,
-        borderTop: `${T}px solid ${c}`, borderRight: `${T}px solid ${c}` }} />
-      <div style={{ position: "absolute", bottom: 36, left: 36, width: L, height: L,
-        borderBottom: `${T}px solid ${c}`, borderLeft: `${T}px solid ${c}` }} />
-      <div style={{ position: "absolute", bottom: 36, right: 36, width: L, height: L,
-        borderBottom: `${T}px solid ${c}`, borderRight: `${T}px solid ${c}` }} />
-    </>
+    <div style={{
+      position: "absolute", inset: 34,
+      border: `2px solid ${PALETTE.paper}${variant === "red" ? "52" : "29"}`,
+      pointerEvents: "none",
+    }} />
   );
 }
 
-function FooterBar({ left, right, color = PALETTE.paper, accentHex }) {
+function FooterBar({ left, right, variant = "navy", accentHex }) {
+  const isRed = variant === "red";
   return (
     <div style={{
-      position: "absolute", left: SPACING.paddingX, right: SPACING.paddingX, bottom: 44,
+      position: "absolute", left: SPACING.paddingX, right: SPACING.paddingX, bottom: 46,
       display: "flex", justifyContent: "space-between", alignItems: "center",
-      fontFamily: displayFont, letterSpacing: "0.32em", fontSize: TYPE_SCALE.small,
-      fontWeight: 500, color, opacity: 0.7, textTransform: "uppercase",
+      fontFamily: displayFont, fontWeight: 600, letterSpacing: "0.28em",
+      fontSize: TYPE_SCALE.small, textTransform: "uppercase",
+      color: `${PALETTE.paper}${isRed ? "D9" : "99"}`,
     }}>
       <span>{left}</span>
       <span style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <span style={{ width: 10, height: 10, borderRadius: 999, background: accentHex,
-          boxShadow: `0 0 12px ${accentHex}` }} />
+        <span style={{
+          width: 12, height: 12, borderRadius: 999,
+          background: isRed ? PALETTE.ink : (accentHex || PALETTE.gold),
+        }} />
         {right}
       </span>
     </div>
@@ -164,103 +128,191 @@ function Eyebrow({ children, accentHex }) {
   return (
     <div style={{
       display: "inline-flex", alignItems: "center", gap: 16,
-      fontFamily: displayFont, fontWeight: 500, fontSize: TYPE_SCALE.meta,
-      letterSpacing: "0.42em", textTransform: "uppercase", color: accentHex,
+      fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
+      letterSpacing: "0.24em", textTransform: "uppercase", color: accentHex,
     }}>
-      <span style={{ display: "inline-block", width: 56, height: 3, background: accentHex,
-        boxShadow: `0 0 10px ${accentHex}` }} />
+      <span style={{ display: "inline-block", width: 52, height: 4, background: accentHex }} />
       {children}
     </div>
   );
 }
 
-function AccentBar({ accentHex, length = 540, thickness = 14 }) {
-  // Glowing accent divider — minimal horizontal bar with a small diamond
-  // ornament centered on top. Theme-neutral by default; themes that want a
-  // hilt, sword silhouette, wand, or other ornament should swap this
-  // component or extend it via props.
-  const ornament = thickness * 1.4;
+// Red rule bar under section titles. RuleGrid adds a thin echo line below.
+function RuleBar({ echo = false }) {
   return (
-    <div style={{ position: "relative", width: length, height: ornament, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{
-        width: length, height: thickness,
-        background: accentHex,
-        boxShadow: `0 0 18px ${accentHex}, 0 0 36px ${accentHex}`,
-        borderRadius: thickness,
-        opacity: 0.85,
-      }} />
-      <div style={{
-        position: "absolute", left: "50%", top: "50%",
-        width: ornament, height: ornament,
-        transform: "translate(-50%, -50%) rotate(45deg)",
-        background: accentHex,
-        boxShadow: `0 0 10px ${accentHex}`,
-      }} />
+    <div style={{ position: "relative", width: 200, height: 6, background: PALETTE.rust, marginTop: 20 }}>
+      {echo && (
+        <span style={{ position: "absolute", left: 0, right: 0, top: 11, height: 2, background: PALETTE.rust }} />
+      )}
     </div>
+  );
+}
+
+function AccentBar({ accentHex = PALETTE.rust, lineColor = `${PALETTE.paper}66`, lineWidth = 180 }) {
+  // Diamond divider — two flat lines flanking a rotated square with the
+  // pulp outline. Theme-neutral by default; themes that want a hilt, sword
+  // silhouette, wand, or other ornament should swap this component or
+  // extend it via props.
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+      <span style={{ width: lineWidth, height: 3, background: lineColor }} />
+      <span style={{
+        width: 18, height: 18, background: accentHex,
+        transform: "rotate(45deg)", border: `2px solid ${PALETTE.inkDeep}`,
+        flex: "0 0 auto",
+      }} />
+      <span style={{ width: lineWidth, height: 3, background: lineColor }} />
+    </div>
+  );
+}
+
+// Venue logo mark. Ships with the FGBC red logo in public/; themed forks
+// replace the PNG (or delete it — onError hides the img cleanly, so the
+// slide simply renders without a mark).
+const LOGO_SRC = `${import.meta.env.BASE_URL}logo-fgbc-red.png`;
+
+function Logo({ size = 150, style }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <img
+      src={LOGO_SRC}
+      alt="Fertile Ground Beer Co"
+      onError={() => setFailed(true)}
+      style={{ height: size, width: "auto", ...style }}
+    />
+  );
+}
+
+// Shared 2×2 rule-grid layout used by RulesSlide, CostumeContestSlide, and
+// TiebreakerIntroSlide. Copy stays in each slide (theme anchors); this owns
+// the layout only.
+function RuleGrid({ label, eyebrow, title, rules, footerLeft, footerRight, accent }) {
+  return (
+    <section data-label={label}>
+      <div style={slideBase}>
+        <Frame />
+        <div style={{
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          height: "100%", display: "flex", flexDirection: "column",
+        }}>
+          <Eyebrow accentHex={accent.hex}>{eyebrow}</Eyebrow>
+          <div style={{
+            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
+            letterSpacing: "0.03em", textTransform: "uppercase", marginTop: 20,
+            color: PALETTE.paper,
+          }}>
+            {title}
+          </div>
+          <RuleBar echo />
+
+          <div style={{
+            marginTop: 60, flex: 1, display: "grid",
+            gridTemplateColumns: "1fr 1fr", gap: "48px 84px",
+          }}>
+            {rules.map((r) => (
+              <div key={r.n} style={{ display: "flex", gap: 30, alignItems: "flex-start" }}>
+                <div style={{
+                  fontFamily: displayFont, fontWeight: 700, fontSize: 82, lineHeight: 0.9,
+                  color: accent.hex, minWidth: 100,
+                  textShadow: hardShadow(5),
+                }}>
+                  {r.n}
+                </div>
+                <div>
+                  <div style={{
+                    fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
+                    letterSpacing: "0.02em", textTransform: "uppercase",
+                    color: PALETTE.paper, marginBottom: 12,
+                  }}>
+                    {r.t}
+                  </div>
+                  <div style={{
+                    fontFamily: bodyFont, fontWeight: 400,
+                    fontSize: TYPE_SCALE.body, lineHeight: 1.4, color: `${PALETTE.paper}AD`,
+                    maxWidth: 560,
+                  }}>
+                    {r.d}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <FooterBar left={footerLeft} right={footerRight} accentHex={accent.hex} />
+      </div>
+    </section>
   );
 }
 
 // ============================================================
 // SLIDE: TITLE
 // ============================================================
-function TitleSlide({ tweaks, accent, title }) {
+function TitleSlide({ accent, title }) {
   const t = title || {};
   return (
     <section data-label="01 Title">
       <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+        <Frame />
 
         <div style={{
           position: "absolute", inset: 0,
           display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          padding: `96px ${SPACING.paddingX}px ${SPACING.paddingX}px`,
           textAlign: "center",
         }}>
-          {t.eyebrow && <Eyebrow accentHex={accent.hex}>{t.eyebrow}</Eyebrow>}
+          <Logo size={150} style={{ marginBottom: 44 }} />
+
+          {t.eyebrow && (
+            <div style={{
+              fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
+              letterSpacing: "0.26em", textTransform: "uppercase", color: accent.hex,
+              whiteSpace: "nowrap",
+            }}>
+              {t.eyebrow}
+            </div>
+          )}
 
           {t.hero && (
             <div style={{
-              fontFamily: displayFont, fontWeight: 700, color: PALETTE.paper,
-              fontSize: 68, letterSpacing: "0.18em", marginTop: 56, marginBottom: 8,
-              textShadow: `0 0 24px ${accent.glow}`,
+              fontFamily: displayFont, fontWeight: 600, color: PALETTE.paper,
+              fontSize: 44, letterSpacing: "0.18em", textTransform: "uppercase",
+              marginTop: 30,
             }}>
               {t.hero}
             </div>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 28, margin: "32px 0 28px" }}>
-            <div style={{ flex: "0 0 auto", height: 2, width: 220, background: PALETTE.paper, opacity: 0.5 }} />
-            <AccentBar accentHex={accent.hex} length={120} thickness={10} />
-            <div style={{ flex: "0 0 auto", height: 2, width: 220, background: PALETTE.paper, opacity: 0.5 }} />
-          </div>
-
           {t.edition && (
             <div style={{
-              fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.92,
-              letterSpacing: "0.02em", color: PALETTE.paper,
-              textShadow: `0 0 40px ${accent.glow}, 0 0 100px ${accent.glow}`,
+              fontFamily: heroFont, fontSize: TYPE_SCALE.display, lineHeight: 0.94,
+              letterSpacing: "-0.01em", textTransform: "uppercase", color: PALETTE.paper,
+              margin: "34px 0 10px",
             }}>
               {t.edition}
             </div>
           )}
           <div style={{
-            fontFamily: displayFont, fontWeight: 600, fontSize: 92, lineHeight: 1,
-            letterSpacing: "0.42em", color: accent.hex, marginTop: 12,
-            textShadow: `0 0 24px ${accent.glow}`,
+            fontFamily: displayFont, fontWeight: 600, fontSize: 64, lineHeight: 1,
+            letterSpacing: "0.34em", textTransform: "uppercase", color: accent.hex,
+            whiteSpace: "nowrap",
           }}>
             TRIVIA NIGHT
           </div>
 
+          <div style={{ margin: "56px 0 40px" }}>
+            <AccentBar accentHex={PALETTE.rust} />
+          </div>
+
           {t.hosts && (
             <div style={{
-              marginTop: 88, display: "flex", alignItems: "center", gap: 22,
-              fontFamily: displayFont, fontSize: TYPE_SCALE.meta, letterSpacing: "0.36em",
-              textTransform: "uppercase", color: PALETTE.paperDim,
+              display: "flex", alignItems: "center", gap: 20, whiteSpace: "nowrap",
+              fontFamily: displayFont, fontWeight: 500, fontSize: 32, letterSpacing: "0.16em",
+              textTransform: "uppercase", color: `${PALETTE.paper}99`,
             }}>
               <span>Hosted by</span>
-              <span style={{ width: 8, height: 8, background: accent.hex, borderRadius: 999,
-                boxShadow: `0 0 10px ${accent.hex}` }} />
+              <span style={{ flex: "0 0 auto", width: 10, height: 10, background: accent.hex, borderRadius: 999 }} />
               <span style={{ color: PALETTE.paper, fontWeight: 600 }}>{t.hosts}</span>
             </div>
           )}
@@ -279,7 +331,7 @@ function TitleSlide({ tweaks, accent, title }) {
 // ============================================================
 // SLIDE: RULES
 // ============================================================
-function RulesSlide({ tweaks, accent }) {
+function RulesSlide({ accent }) {
   const rules = [
     { n: "I",   t: "No phones",                 d: "Looking up answers will result in points being deducted at the hosts' discretion." },
     { n: "II",  t: "Spelling is best attempt",  d: "Misspellings are fine as long as the answer is unambiguous and correct." },
@@ -287,131 +339,89 @@ function RulesSlide({ tweaks, accent }) {
     { n: "IV",  t: "Have fun",                  d: "Lean in, get into it, and don't take any single question too seriously." },
   ];
   return (
-    <section data-label="02 Rules">
-      <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
-
-        <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
-          height: "100%", display: "flex", flexDirection: "column",
-        }}>
-          <Eyebrow accentHex={accent.hex}>Section I</Eyebrow>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-            letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
-          }}>
-            HOUSE RULES
-          </div>
-          <div style={{
-            height: 4, width: 180, background: accent.hex, marginTop: 22,
-            boxShadow: `0 0 16px ${accent.glow}`,
-          }} />
-
-          <div style={{
-            marginTop: 64, display: "grid", gridTemplateColumns: "1fr 1fr",
-            gap: "44px 80px", flex: 1,
-          }}>
-            {rules.map((r) => (
-              <div key={r.n} style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
-                <div style={{
-                  fontFamily: displayFont, fontWeight: 700, fontSize: 80, lineHeight: 0.9,
-                  color: accent.hex, minWidth: 96,
-                  textShadow: `0 0 18px ${accent.glow}`,
-                }}>
-                  {r.n}
-                </div>
-                <div>
-                  <div style={{
-                    fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
-                    letterSpacing: "0.04em", color: PALETTE.paper, marginBottom: 12,
-                  }}>
-                    {r.t}
-                  </div>
-                  <div style={{
-                    fontFamily: "'Inter', sans-serif", fontWeight: 400,
-                    fontSize: TYPE_SCALE.body, lineHeight: 1.35, color: PALETTE.paperDim,
-                    maxWidth: 560,
-                  }}>
-                    {r.d}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <FooterBar left="House Rules" right="Read Before Play" accentHex={accent.hex} />
-      </div>
-    </section>
+    <RuleGrid
+      label="02 Rules"
+      eyebrow="Section I"
+      title="House Rules"
+      rules={rules}
+      footerLeft="House Rules"
+      footerRight="Read Before Play"
+      accent={accent}
+    />
   );
 }
 
 // ============================================================
 // SLIDE: PRIZE
 // ============================================================
-function PrizeSlide({ tweaks, accent }) {
+function PrizeSlide() {
   return (
     <section data-label="03 Grand Prize">
-      <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+      <div style={slideSurface("red")}>
+        <Frame variant="red" />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingTop}px`,
           height: "100%", display: "flex", flexDirection: "column", justifyContent: "center",
           alignItems: "center", textAlign: "center",
         }}>
-          <Eyebrow accentHex={accent.hex}>Tonight's Bounty</Eyebrow>
-
           <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-            color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 28,
+            fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
+            letterSpacing: "0.26em", textTransform: "uppercase", color: PALETTE.paper,
           }}>
-            GRAND PRIZE
+            Tonight's Bounty
           </div>
 
           <div style={{
-            marginTop: 56,
-            border: `4px solid ${accent.hex}`,
-            padding: "60px 88px",
-            position: "relative",
-            boxShadow: `0 0 40px ${accent.glow}, inset 0 0 40px ${accent.glow}`,
+            fontFamily: displayFont, fontWeight: 700, fontSize: 88,
+            letterSpacing: "0.03em", textTransform: "uppercase",
+            color: PALETTE.paper, marginTop: 22,
+          }}>
+            Grand Prize
+          </div>
+
+          <div style={{
+            position: "relative", marginTop: 54,
+            background: PALETTE.paper,
+            border: `3px solid ${PALETTE.inkDeep}`,
+            boxShadow: hardShadow(10),
+            padding: "58px 96px",
           }}>
             <div style={{
-              position: "absolute", top: -18, left: "50%", transform: "translateX(-50%)",
-              background: PALETTE.ink, padding: "0 22px",
-              fontFamily: displayFont, fontSize: TYPE_SCALE.small, letterSpacing: "0.4em",
-              color: accent.hex, fontWeight: 600,
+              position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)",
+              background: PALETTE.ink, color: PALETTE.paper,
+              border: `2px solid ${PALETTE.inkDeep}`,
+              padding: "8px 22px",
+              fontFamily: displayFont, fontWeight: 700, fontSize: 24, letterSpacing: "0.2em",
+              textTransform: "uppercase", whiteSpace: "nowrap",
             }}>
               ★ WINNER TAKES ALL ★
             </div>
 
             <div style={{
-              fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 1,
-              color: PALETTE.paper, letterSpacing: "0.01em",
-              textShadow: `0 0 32px ${accent.glow}`,
+              fontFamily: heroFont, fontSize: 220, lineHeight: 1,
+              color: PALETTE.ink,
             }}>
               $100
             </div>
             <div style={{
-              fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
-              letterSpacing: "0.16em", color: accent.hex, marginTop: 16,
+              fontFamily: displayFont, fontWeight: 700, fontSize: 44,
+              letterSpacing: "0.1em", textTransform: "uppercase",
+              color: PALETTE.rust, marginTop: 12,
             }}>
               FERTILE GROUND GIFT CARD
             </div>
           </div>
 
           <div style={{
-            marginTop: 48, fontFamily: "'Inter', sans-serif",
-            fontSize: TYPE_SCALE.body, color: PALETTE.paperDim, fontStyle: "italic",
-            maxWidth: 900,
+            marginTop: 46, fontFamily: bodyFont, fontStyle: "italic",
+            fontSize: 34, color: `${PALETTE.paper}D9`, maxWidth: 900,
           }}>
             More than enough to cover your tab tonight.
           </div>
         </div>
 
-        <FooterBar left="Grand Prize" right="One Winning Team" accentHex={accent.hex} />
+        <FooterBar left="Grand Prize" right="One Winning Team" variant="red" />
       </div>
     </section>
   );
@@ -420,7 +430,7 @@ function PrizeSlide({ tweaks, accent }) {
 // ============================================================
 // SLIDE: COSTUME CONTEST
 // ============================================================
-function CostumeContestSlide({ tweaks, accent }) {
+function CostumeContestSlide({ accent }) {
   const rules = [
     { n: "I",   t: "Open to All Guests",    d: "Any guest can enter — you don't need to be on a trivia team to win." },
     { n: "II",  t: "On-Theme Costumes",     d: "Costumes must fit tonight's theme. Original concepts welcome if the connection is clear." },
@@ -428,125 +438,75 @@ function CostumeContestSlide({ tweaks, accent }) {
     { n: "IV",  t: "Individual Prize",      d: "One winner takes home a package beer as a side prize." },
   ];
   return (
-    <section data-label="04 Costume Contest">
-      <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
-
-        <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
-          height: "100%", display: "flex", flexDirection: "column",
-        }}>
-          <Eyebrow accentHex={accent.hex}>Bonus Challenge</Eyebrow>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-            letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
-          }}>
-            COSTUME CONTEST
-          </div>
-          <div style={{
-            height: 4, width: 180, background: accent.hex, marginTop: 22,
-            boxShadow: `0 0 16px ${accent.glow}`,
-          }} />
-
-          <div style={{
-            marginTop: 64, display: "grid", gridTemplateColumns: "1fr 1fr",
-            gap: "44px 80px", flex: 1,
-          }}>
-            {rules.map((r) => (
-              <div key={r.n} style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
-                <div style={{
-                  fontFamily: displayFont, fontWeight: 700, fontSize: 80, lineHeight: 0.9,
-                  color: accent.hex, minWidth: 96,
-                  textShadow: `0 0 18px ${accent.glow}`,
-                }}>
-                  {r.n}
-                </div>
-                <div>
-                  <div style={{
-                    fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
-                    letterSpacing: "0.04em", color: PALETTE.paper, marginBottom: 12,
-                  }}>
-                    {r.t}
-                  </div>
-                  <div style={{
-                    fontFamily: "'Inter', sans-serif", fontWeight: 400,
-                    fontSize: TYPE_SCALE.body, lineHeight: 1.35, color: PALETTE.paperDim,
-                    maxWidth: 560,
-                  }}>
-                    {r.d}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <FooterBar left="Costume Contest" right="Enter anytime at the host's table." accentHex={accent.hex} />
-      </div>
-    </section>
+    <RuleGrid
+      label="04 Costume Contest"
+      eyebrow="Bonus Challenge"
+      title="Costume Contest"
+      rules={rules}
+      footerLeft="Costume Contest"
+      footerRight="Enter anytime at the host's table."
+      accent={accent}
+    />
   );
 }
 
 // ============================================================
-// SLIDE: ROUND OPENER (large numeral, theme)
+// SLIDE: ROUND OPENER (large numeral, red surface)
 // ============================================================
-function RoundOpener({ number, title, subtitle, kicker, tweaks, accent, label }) {
+function RoundOpener({ number, title, subtitle, kicker, label }) {
   return (
     <section data-label={label}>
-      <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+      <div style={slideSurface("red")}>
+        <Frame variant="red" />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
-          height: "100%", display: "flex", alignItems: "center", gap: 80,
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingTop}px`,
+          height: "100%", display: "flex", alignItems: "center", gap: 72,
         }}>
           {/* Massive numeral */}
           <div style={{
-            position: "relative", flex: "0 0 auto",
+            flex: "0 0 auto",
+            fontFamily: displayFont, fontWeight: 700, fontSize: 560, lineHeight: 0.78,
+            color: PALETTE.paper, letterSpacing: "-0.03em",
+            textShadow: hardShadow(14),
           }}>
-            <div style={{
-              fontFamily: displayFont, fontWeight: 700, fontSize: 720, lineHeight: 0.78,
-              color: PALETTE.paper, letterSpacing: "-0.02em",
-              textShadow: `0 0 60px ${accent.glow}, 0 0 120px ${accent.glow}`,
-              WebkitTextStroke: `0px ${accent.hex}`,
-            }}>
-              {String(number).padStart(2, "0")}
-            </div>
+            {String(number).padStart(2, "0")}
           </div>
 
           {/* Right text block */}
-          <div style={{ flex: 1, borderLeft: `4px solid ${accent.hex}`, paddingLeft: 56,
-            boxShadow: `inset 4px 0 16px ${accent.glow}` }}>
+          <div style={{ flex: 1, borderLeft: `5px solid ${PALETTE.paper}`, paddingLeft: 56 }}>
             <div style={{
-              fontFamily: displayFont, fontWeight: 500, fontSize: TYPE_SCALE.meta,
-              letterSpacing: "0.42em", color: accent.hex, marginBottom: 28,
+              fontFamily: displayFont, fontWeight: 600, fontSize: 32,
+              letterSpacing: "0.38em", textTransform: "uppercase",
+              color: PALETTE.paper, marginBottom: 26,
             }}>
               ROUND
             </div>
             <div style={{
-              fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-              color: PALETTE.paper, letterSpacing: "0.03em", lineHeight: 1.0,
+              fontFamily: displayFont, fontWeight: 700, fontSize: 96,
+              color: PALETTE.paper, letterSpacing: "0.02em", lineHeight: 1.0,
               textTransform: "uppercase",
             }}>
               {title}
             </div>
             {subtitle && (
               <div style={{
-                fontFamily: "'Inter', sans-serif", fontWeight: 400,
-                fontSize: TYPE_SCALE.subtitle, color: PALETTE.paperDim, marginTop: 32,
-                lineHeight: 1.3, maxWidth: 740,
+                fontFamily: bodyFont, fontWeight: 400,
+                fontSize: 40, color: `${PALETTE.paper}D9`, marginTop: 30,
+                lineHeight: 1.35, maxWidth: 760,
               }}>
                 {subtitle}
               </div>
             )}
             {kicker && (
               <div style={{
-                marginTop: 56, display: "inline-block",
-                padding: "16px 28px", border: `2px solid ${accent.hex}`,
-                fontFamily: displayFont, fontSize: TYPE_SCALE.small,
-                letterSpacing: "0.32em", color: accent.hex, fontWeight: 600,
+                marginTop: 48, display: "inline-block",
+                background: PALETTE.ink, color: PALETTE.paper,
+                border: `2px solid ${PALETTE.inkDeep}`,
+                boxShadow: hardShadow(6),
+                padding: "14px 28px",
+                fontFamily: displayFont, fontWeight: 700, fontSize: 28,
+                letterSpacing: "0.16em", textTransform: "uppercase",
               }}>
                 {kicker}
               </div>
@@ -554,7 +514,7 @@ function RoundOpener({ number, title, subtitle, kicker, tweaks, accent, label })
           </div>
         </div>
 
-        <FooterBar left={`Round ${String(number).padStart(2, "0")}`} right={title} accentHex={accent.hex} />
+        <FooterBar left={`Round ${String(number).padStart(2, "0")}`} right={title} variant="red" />
       </div>
     </section>
   );
@@ -563,7 +523,7 @@ function RoundOpener({ number, title, subtitle, kicker, tweaks, accent, label })
 // ============================================================
 // SLIDE: ROUND 1 PICTURE-ROUND INSTRUCTIONS
 // ============================================================
-function PictureRoundInstructions({ tweaks, accent }) {
+function PictureRoundInstructions({ accent }) {
   const steps = [
     { n: "01", t: "Form your team",   d: "Gather your group and pick a team name. Pun-heavy or theme-on-theme is encouraged." },
     { n: "02", t: "Collect your sheet", d: "One Round 1 picture sheet per team. Grab one from Jack or Michael at the host stand." },
@@ -573,61 +533,54 @@ function PictureRoundInstructions({ tweaks, accent }) {
   return (
     <section data-label="05 Round 1 Instructions">
       <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+        <Frame />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px 130px`,
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
           height: "100%", display: "flex", flexDirection: "column",
         }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 32 }}>
-            <Eyebrow accentHex={accent.hex}>Round 01 · Picture Round</Eyebrow>
-          </div>
+          <Eyebrow accentHex={accent.hex}>Round 01 · Picture Round</Eyebrow>
 
           <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-            color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 24, lineHeight: 1.0,
+            fontFamily: displayFont, fontWeight: 700, fontSize: 84,
+            letterSpacing: "0.03em", textTransform: "uppercase",
+            color: PALETTE.paper, marginTop: 20, lineHeight: 1.0,
           }}>
-            ON PAPER, NOT ON SCREEN
+            On Paper, Not on Screen
           </div>
           <div style={{
-            fontFamily: "'Inter', sans-serif", fontSize: TYPE_SCALE.body,
-            color: PALETTE.paperDim, marginTop: 28, maxWidth: 1200, lineHeight: 1.35,
+            fontFamily: bodyFont, fontSize: 34,
+            color: `${PALETTE.paper}B3`, marginTop: 24, maxWidth: 1200, lineHeight: 1.35,
           }}>
             This round is played from a paper sheet handed out by the hosts. Identify each image and write your answer in the space provided.
           </div>
 
           <div style={{
-            marginTop: 56, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr",
-            gap: 28, flex: 1,
+            marginTop: 50, flex: 1, display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)", gap: 26,
           }}>
             {steps.map((s) => (
               <div key={s.n} style={{
-                border: `2px solid ${PALETTE.paper}33`,
+                border: `2px solid ${PALETTE.paper}47`,
+                background: `${PALETTE.paper}0A`,
                 padding: "32px 28px", display: "flex", flexDirection: "column",
-                background: `${PALETTE.paper}06`,
-                position: "relative",
               }}>
                 <div style={{
-                  fontFamily: displayFont, fontSize: TYPE_SCALE.subtitle, fontWeight: 700,
-                  color: accent.hex, letterSpacing: "0.06em",
-                  textShadow: `0 0 14px ${accent.glow}`,
+                  fontFamily: displayFont, fontWeight: 700, fontSize: 52,
+                  color: accent.hex,
                 }}>
                   {s.n}
                 </div>
+                <div style={{ height: 3, width: 56, background: PALETTE.rust, margin: "16px 0 22px" }} />
                 <div style={{
-                  height: 2, width: 56, background: accent.hex, margin: "16px 0 24px",
-                }} />
-                <div style={{
-                  fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.body,
-                  color: PALETTE.paper, letterSpacing: "0.04em", marginBottom: 16,
-                  textTransform: "uppercase",
+                  fontFamily: displayFont, fontWeight: 600, fontSize: 34,
+                  textTransform: "uppercase", color: PALETTE.paper, marginBottom: 14,
                 }}>
                   {s.t}
                 </div>
                 <div style={{
-                  fontFamily: "'Inter', sans-serif", fontSize: TYPE_SCALE.small,
-                  color: PALETTE.paperDim, lineHeight: 1.4,
+                  fontFamily: bodyFont, fontSize: 28,
+                  color: `${PALETTE.paper}A8`, lineHeight: 1.4,
                 }}>
                   {s.d}
                 </div>
@@ -636,19 +589,18 @@ function PictureRoundInstructions({ tweaks, accent }) {
           </div>
 
           <div style={{
-            marginTop: 36, padding: "24px 32px",
-            background: `${accent.hex}14`, border: `2px solid ${accent.hex}`,
-            display: "flex", alignItems: "center", gap: 24,
+            marginTop: 34, padding: "24px 32px",
+            background: PALETTE.rust, border: `2px solid ${PALETTE.inkDeep}`,
+            display: "flex", alignItems: "center", gap: 26,
           }}>
             <div style={{
-              fontFamily: displayFont, fontSize: TYPE_SCALE.meta, color: accent.hex,
-              letterSpacing: "0.4em", fontWeight: 700,
+              fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.meta,
+              letterSpacing: "0.32em", textTransform: "uppercase", color: PALETTE.paper,
             }}>
               REMINDER
             </div>
             <div style={{
-              fontFamily: "'Inter', sans-serif", fontSize: TYPE_SCALE.small,
-              color: PALETTE.paper,
+              fontFamily: bodyFont, fontSize: TYPE_SCALE.body, color: PALETTE.paper,
             }}>
               No phones. Spelling is best attempt — just make sure we can tell who you mean.
             </div>
@@ -739,33 +691,32 @@ function QuestionSlide({
   return (
     <section data-label={dataLabel}>
       <div style={slideBase} ref={ref}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+        <Frame />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px 92px`,
           height: "100%", display: "flex", flexDirection: "column",
         }}>
           {/* Header strip */}
           <div style={{
             display: "flex", justifyContent: "space-between", alignItems: "center",
-            paddingBottom: 28, borderBottom: `2px solid ${PALETTE.paper}22`,
+            paddingBottom: 26, borderBottom: `2px solid ${PALETTE.paper}38`,
           }}>
             {tweaks.showQNumbers ? (
               <div style={{
                 fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
-                letterSpacing: "0.42em", color: accent.hex,
+                letterSpacing: "0.28em", textTransform: "uppercase", color: accent.hex,
               }}>
                 {isTiebreaker ? "TIEBREAKER" : `ROUND ${String(round).padStart(2, "0")}`}
-                <span style={{ color: PALETTE.paperDim, margin: "0 18px" }}>·</span>
+                <span style={{ color: `${PALETTE.paper}99`, margin: "0 18px" }}>·</span>
                 QUESTION {String(q).padStart(2, "0")}
-                <span style={{ color: PALETTE.paperDim, margin: "0 18px" }}>·</span>
-                <span style={{ color: PALETTE.paperDim }}>OF {String(total).padStart(2, "0")}</span>
+                <span style={{ color: `${PALETTE.paper}99`, margin: "0 18px" }}>·</span>
+                <span style={{ color: `${PALETTE.paper}99` }}>OF {String(total).padStart(2, "0")}</span>
               </div>
             ) : (
               <div style={{
                 fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
-                letterSpacing: "0.42em", color: accent.hex,
+                letterSpacing: "0.28em", textTransform: "uppercase", color: accent.hex,
               }}>
                 {roundTitle}
               </div>
@@ -773,7 +724,7 @@ function QuestionSlide({
             {!tweaks.showTimer && (
               <div style={{
                 fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
-                letterSpacing: "0.42em", color: PALETTE.paperDim,
+                letterSpacing: "0.28em", textTransform: "uppercase", color: `${PALETTE.paper}99`,
               }}>
                 {roundTitle}
               </div>
@@ -782,49 +733,37 @@ function QuestionSlide({
 
           {/* Big numeral + prompt */}
           <div style={{
-            flex: 1, display: "flex", alignItems: "center", gap: 72, marginTop: 32,
+            flex: 1, display: "flex", alignItems: "center", gap: 72, marginTop: 20,
           }}>
-            <div style={{ flex: "0 0 auto", position: "relative" }}>
-              <div style={{
-                fontFamily: displayFont, fontWeight: 700, fontSize: 520, lineHeight: 0.82,
-                color: "transparent",
-                WebkitTextStroke: `3px ${accent.hex}`,
-                letterSpacing: "-0.02em",
-                filter: `drop-shadow(0 0 24px ${accent.glow})`,
-              }}>
-                {String(q).padStart(2, "0")}
-              </div>
-              <div style={{
-                position: "absolute", top: 20, left: 26,
-                fontFamily: displayFont, fontWeight: 700, fontSize: 520, lineHeight: 0.82,
-                color: `${PALETTE.paper}10`, letterSpacing: "-0.02em",
-              }}>
-                {String(q).padStart(2, "0")}
-              </div>
+            <div style={{
+              flex: "0 0 auto",
+              fontFamily: displayFont, fontWeight: 700, fontSize: 420, lineHeight: 0.8,
+              color: PALETTE.paper, letterSpacing: "-0.03em",
+              textShadow: hardShadow(12, PALETTE.rustDeep),
+            }}>
+              {String(q).padStart(2, "0")}
             </div>
 
-            <div style={{ flex: 1, paddingLeft: 56, borderLeft: `4px solid ${accent.hex}`,
-              boxShadow: `inset 4px 0 12px ${accent.glow}` }}>
+            <div style={{ flex: 1, paddingLeft: 56, borderLeft: `5px solid ${PALETTE.rust}` }}>
               <div style={{
-                fontFamily: displayFont, fontSize: TYPE_SCALE.meta, fontWeight: 500,
-                letterSpacing: "0.42em", color: accent.hex, marginBottom: 28,
-                textShadow: `0 0 8px ${accent.glow}`,
+                fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
+                letterSpacing: "0.34em", textTransform: "uppercase",
+                color: accent.hex, marginBottom: 26,
               }}>
-                ★ QUESTION
+                QUESTION
               </div>
               <div style={{
-                fontFamily: "'Inter', sans-serif", fontWeight: 500,
-                fontSize: 64, lineHeight: 1.18, color: PALETTE.paper,
-                letterSpacing: "-0.005em",
+                fontFamily: bodyFont, fontWeight: 500,
+                fontSize: 60, lineHeight: 1.2, color: PALETTE.paper,
                 textWrap: "pretty",
               }}>
                 {prompt}
               </div>
               {displayHint && (
                 <div style={{
-                  marginTop: 18, fontFamily: "'Inter', sans-serif",
+                  marginTop: 18, fontFamily: bodyFont,
                   fontStyle: "italic", fontSize: TYPE_SCALE.body,
-                  color: PALETTE.paperDim, lineHeight: 1.3,
+                  color: `${PALETTE.paper}B3`, lineHeight: 1.3,
                 }}>
                   {displayHint}
                 </div>
@@ -836,8 +775,8 @@ function QuestionSlide({
                     alt="Question media"
                     style={{
                       maxWidth: "100%", maxHeight: 360, objectFit: "contain",
-                      border: `2px solid ${accent.hex}`,
-                      boxShadow: `0 0 24px ${accent.glow}`,
+                      border: `2px solid ${PALETTE.inkDeep}`,
+                      boxShadow: hardShadow(8),
                     }}
                   />
                 </div>
@@ -857,21 +796,21 @@ function QuestionSlide({
                   preload="auto"
                   style={{
                     marginTop: 24, maxWidth: "100%", maxHeight: 360,
-                    border: `2px solid ${accent.hex}`,
-                    boxShadow: `0 0 24px ${accent.glow}`,
+                    border: `2px solid ${PALETTE.inkDeep}`,
+                    boxShadow: hardShadow(8),
                   }}
                 />
               )}
             </div>
           </div>
 
-          {/* Timer placeholder when on */}
+          {/* Timer overlay when on */}
           {tweaks.showTimer && (
             <div style={{
-              position: "absolute", right: SPACING.paddingX, top: SPACING.paddingTop - 12,
-              fontFamily: displayFont, fontWeight: 700, fontSize: 88,
-              color: accent.hex, letterSpacing: "0.04em",
-              textShadow: `0 0 18px ${accent.glow}`,
+              position: "absolute", right: SPACING.paddingX, top: 120,
+              fontFamily: displayFont, fontWeight: 700, fontSize: 80,
+              color: accent.hex, letterSpacing: "0.02em",
+              textShadow: hardShadow(5),
             }}>
               {seconds}s
             </div>
@@ -895,25 +834,24 @@ function QuestionSlide({
 // One round produces two of these slides (questions 1–5, then 6–10) so
 // each prompt can wrap fully without being truncated.
 // ============================================================
-function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex = 0, part = "A" }) {
+function RoundRecap({ round, roundTitle, questions, accent, startIndex = 0, part = "A" }) {
   const start = startIndex + 1;
   const end = startIndex + questions.length;
   return (
     <section data-label={`R${round} Recap ${part}`}>
       <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+        <Frame />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          padding: `96px ${SPACING.paddingX}px 92px`,
           height: "100%", display: "flex", flexDirection: "column",
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
             <div>
               <Eyebrow accentHex={accent.hex}>End of Round {String(round).padStart(2, "0")}</Eyebrow>
               <div style={{
-                fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-                color: PALETTE.paper, letterSpacing: "0.03em", marginTop: 22,
+                fontFamily: displayFont, fontWeight: 700, fontSize: 76,
+                color: PALETTE.paper, letterSpacing: "0.02em", marginTop: 18,
                 textTransform: "uppercase",
               }}>
                 Recap · {roundTitle}
@@ -921,35 +859,33 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex =
             </div>
             <div style={{
               fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
-              letterSpacing: "0.4em", color: PALETTE.paperDim,
+              letterSpacing: "0.3em", textTransform: "uppercase", color: `${PALETTE.paper}99`,
             }}>
               QUESTIONS {String(start).padStart(2, "0")}–{String(end).padStart(2, "0")}
             </div>
           </div>
 
-          <div style={{ height: 4, width: 180, background: accent.hex, marginTop: 20,
-            boxShadow: `0 0 14px ${accent.glow}` }} />
+          <RuleBar />
 
           <div style={{
-            marginTop: 28, flex: 1, display: "flex", flexDirection: "column",
-            gap: 12, overflow: "hidden",
+            marginTop: 24, flex: 1, display: "flex", flexDirection: "column",
+            justifyContent: "center", gap: 14, overflow: "hidden",
           }}>
             {questions.map((q, i) => (
               <div key={i} style={{
-                display: "flex", gap: 24, alignItems: "baseline",
-                paddingBottom: 10, borderBottom: `1px solid ${PALETTE.paper}1A`,
+                display: "flex", gap: 26, alignItems: "baseline",
+                paddingBottom: 12, borderBottom: `1px solid ${PALETTE.paper}29`,
                 minWidth: 0,
               }}>
                 <div style={{
-                  fontFamily: displayFont, fontWeight: 700, fontSize: 40,
-                  color: accent.hex, letterSpacing: "0.04em", minWidth: 60,
-                  textShadow: `0 0 10px ${accent.glow}`,
+                  fontFamily: displayFont, fontWeight: 700, fontSize: 42,
+                  color: accent.hex, letterSpacing: "0.02em", minWidth: 64,
                   flex: "0 0 auto",
                 }}>
                   {String(startIndex + i + 1).padStart(2, "0")}
                 </div>
                 <div style={{
-                  fontFamily: "'Inter', sans-serif", fontSize: 32, lineHeight: 1.28,
+                  fontFamily: bodyFont, fontSize: 34, lineHeight: 1.3,
                   color: PALETTE.paper, fontWeight: 400,
                   flex: 1, minWidth: 0, maxWidth: 1600,
                 }}>
@@ -974,11 +910,11 @@ function RoundRecap({ round, roundTitle, questions, tweaks, accent, startIndex =
 // ============================================================
 // SLIDE: INTERMISSION
 // ============================================================
-const INTERMISSION_WORDS = ["SUBMIT.", "STRETCH.", "REFILL.", "REGROUP."];
+const INTERMISSION_WORDS = ["Submit.", "Stretch.", "Refill.", "Regroup."];
 
-function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, label }) {
+function IntermissionSlide({ nextRound, nextTitle, nextLabel, label }) {
   const upNextText = nextLabel || `Round ${String(nextRound).padStart(2, "0")} · ${nextTitle}`;
-  // Walk the accent highlight top-to-bottom through the words, looping while the
+  // Walk the highlight top-to-bottom through the words, looping while the
   // slide is on screen. Honor reduced-motion by holding on the first word.
   const [activeWord, setActiveWord] = useState(0);
   useEffect(() => {
@@ -987,30 +923,34 @@ function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, la
     if (reduce) return;
     const id = setInterval(
       () => setActiveWord((i) => (i + 1) % INTERMISSION_WORDS.length),
-      1100,
+      1300,
     );
     return () => clearInterval(id);
   }, []);
   return (
     <section data-label={label}>
-      <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+      <div style={slideSurface("red")}>
+        <Frame variant="red" />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          padding: `90px ${SPACING.paddingX}px 90px`,
           height: "100%", display: "flex", flexDirection: "column", justifyContent: "center",
           alignItems: "center", textAlign: "center",
         }}>
-          <Eyebrow accentHex={accent.hex}>Intermission</Eyebrow>
+          <div style={{
+            fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
+            letterSpacing: "0.32em", textTransform: "uppercase",
+            color: PALETTE.paper, marginBottom: 24,
+          }}>
+            Intermission
+          </div>
           {INTERMISSION_WORDS.map((word, i) => {
             const active = i === activeWord;
             return (
               <div key={word} style={{
-                fontFamily: displayFont, fontWeight: 700, fontSize: 160, lineHeight: 1.05,
-                letterSpacing: "0.04em", marginTop: i === 0 ? 24 : 0,
-                color: active ? accent.hex : PALETTE.paper,
-                textShadow: active ? `0 0 50px ${accent.glow}` : `0 0 40px ${accent.glow}`,
+                fontFamily: heroFont, fontSize: TYPE_SCALE.display, lineHeight: 1.02,
+                color: active ? PALETTE.paper : `${PALETTE.paper}66`,
+                textShadow: active ? hardShadow(9) : "none",
                 transition: "color 450ms ease, text-shadow 450ms ease",
               }}>
                 {word}
@@ -1018,15 +958,13 @@ function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, la
             );
           })}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 28, marginTop: 36 }}>
-            <div style={{ height: 2, width: 180, background: PALETTE.paper, opacity: 0.4 }} />
-            <AccentBar accentHex={accent.hex} length={120} thickness={10} />
-            <div style={{ height: 2, width: 180, background: PALETTE.paper, opacity: 0.4 }} />
+          <div style={{ margin: "44px 0 28px" }}>
+            <AccentBar accentHex={PALETTE.ink} lineColor={`${PALETTE.paper}80`} lineWidth={160} />
           </div>
 
           <div style={{
-            marginTop: 36, fontFamily: displayFont, fontSize: TYPE_SCALE.subtitle,
-            color: PALETTE.paperDim, letterSpacing: "0.16em",
+            fontFamily: displayFont, fontWeight: 600, fontSize: 44,
+            letterSpacing: "0.12em", textTransform: "uppercase", color: PALETTE.paper,
           }}>
             Up next · {upNextText}
           </div>
@@ -1036,7 +974,7 @@ function IntermissionSlide({ nextRound, nextTitle, nextLabel, tweaks, accent, la
   );
 }
 
-function PictureRecapCell({ item, index, accent, fit = "cover", aspect = "316 / 220" }) {
+function PictureRecapCell({ item, index, fit = "cover", aspect = "316 / 220" }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => { setFailed(false); }, [item.src]);
   const showImage = item.src && !failed;
@@ -1050,9 +988,8 @@ function PictureRecapCell({ item, index, accent, fit = "cover", aspect = "316 / 
     <div style={{
       aspectRatio: resolveAspect(aspect).css,
       position: "relative",
-      background: `${PALETTE.paper}06`,
-      border: `2px solid ${accent.hex}33`,
-      borderRadius: 4,
+      background: `${PALETTE.paper}0D`,
+      border: `2px solid ${PALETTE.paper}47`,
       overflow: "hidden",
     }}>
       {showImage ? (
@@ -1069,14 +1006,12 @@ function PictureRecapCell({ item, index, accent, fit = "cover", aspect = "316 / 
         />
       ) : (
         <div style={{
-          position: "absolute", inset: 8,
+          position: "absolute", inset: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          border: `2px dashed ${PALETTE.paper}22`,
-          borderRadius: 2,
         }}>
           <div style={{
-            fontFamily: displayFont, fontSize: TYPE_SCALE.meta, fontWeight: 500,
-            color: PALETTE.paperDim, letterSpacing: "0.36em", opacity: 0.55,
+            fontFamily: displayFont, fontSize: 28, fontWeight: 600,
+            color: `${PALETTE.paper}66`, letterSpacing: "0.3em", textTransform: "uppercase",
           }}>
             PHOTO
           </div>
@@ -1084,12 +1019,11 @@ function PictureRecapCell({ item, index, accent, fit = "cover", aspect = "316 / 
       )}
       <div style={{
         position: "absolute", top: 12, left: 12,
-        width: 56, height: 56,
+        width: 50, height: 50,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontFamily: displayFont, fontWeight: 700, fontSize: 30,
-        color: PALETTE.ink, background: accent.hex,
-        boxShadow: `0 0 18px ${accent.glow}`,
-        borderRadius: 4, letterSpacing: "0.02em",
+        fontFamily: displayFont, fontWeight: 700, fontSize: 26,
+        color: PALETTE.paper, background: PALETTE.rust,
+        border: `2px solid ${PALETTE.inkDeep}`,
       }}>
         {String(index + 1).padStart(2, "0")}
       </div>
@@ -1097,9 +1031,9 @@ function PictureRecapCell({ item, index, accent, fit = "cover", aspect = "316 / 
         <div style={{
           position: "absolute", bottom: 0, left: 0, right: 0,
           padding: "10px 14px",
-          background: `linear-gradient(180deg, transparent, ${PALETTE.paper}D9)`,
-          fontFamily: "'Inter', sans-serif", fontSize: 28, fontWeight: 500,
-          color: PALETTE.ink, letterSpacing: "0.02em",
+          background: `linear-gradient(180deg, transparent, ${PALETTE.inkDeep}D9)`,
+          fontFamily: bodyFont, fontSize: 28, fontWeight: 500,
+          color: PALETTE.paper, letterSpacing: "0.02em",
         }}>
           {item.caption}
         </div>
@@ -1114,7 +1048,7 @@ function PictureRecapCell({ item, index, accent, fit = "cover", aspect = "316 / 
 // design for the paper handout. Cells are placeholder boxes when item.src
 // is null; render an <img> when src is present.
 // ============================================================
-function PictureRoundRecap({ items, tweaks, accent, pictureRound }) {
+function PictureRoundRecap({ items, accent, pictureRound }) {
   const fit = pictureRound?.fit ?? "cover";
   const aspect = pictureRound?.aspect ?? "316 / 220";
   // Cap the grid width so tall aspects (square) shrink + center instead of
@@ -1123,44 +1057,41 @@ function PictureRoundRecap({ items, tweaks, accent, pictureRound }) {
   // cellExtra is 0. For the default landscape aspect this returns full width.
   const grid = pictureGridLayout({
     aspect, cols: 5, rows: 2, contentW: 1920 - SPACING.paddingX * 2,
-    availH: 560, gap: 24, cellExtra: 0,
+    availH: 560, gap: 20, cellExtra: 0,
   });
   return (
     <section data-label="Picture Round Recap">
       <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+        <Frame />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          padding: `90px ${SPACING.paddingX}px 92px`,
           height: "100%", display: "flex", flexDirection: "column",
         }}>
           <Eyebrow accentHex={accent.hex}>Round 01 · Recap</Eyebrow>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-            letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
-          }}>
-            PICTURE ROUND
+          <div style={{ display: "flex", alignItems: "baseline", gap: 28, marginTop: 18 }}>
+            <div style={{
+              fontFamily: displayFont, fontWeight: 700, fontSize: 76,
+              letterSpacing: "0.03em", textTransform: "uppercase", color: PALETTE.paper,
+            }}>
+              Picture Round
+            </div>
+            <div style={{
+              fontFamily: bodyFont, fontStyle: "italic",
+              fontSize: 32, color: `${PALETTE.paper}B3`,
+            }}>
+              {pictureRound?.instruction ?? "Identify the character, place, ship or creature."}
+            </div>
           </div>
-          <div style={{
-            height: 4, width: 180, background: accent.hex, marginTop: 22,
-            boxShadow: `0 0 16px ${accent.glow}`,
-          }} />
+          <RuleBar />
 
           <div style={{
-            marginTop: 24, fontFamily: "'Inter', sans-serif", fontStyle: "italic",
-            fontSize: TYPE_SCALE.body, color: PALETTE.paperDim, maxWidth: 1200,
-          }}>
-            {pictureRound?.instruction ?? "Identify the character, place, ship or creature."}
-          </div>
-
-          <div style={{
-            marginTop: 32, display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: 24, width: grid.gridW, alignSelf: "center",
+            marginTop: 28, flex: 1, display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)", alignContent: "center",
+            gap: 20, width: grid.gridW, alignSelf: "center",
           }}>
             {items.map((item, i) => (
-              <PictureRecapCell key={i} item={item} index={i} accent={accent} fit={fit} aspect={aspect} />
+              <PictureRecapCell key={i} item={item} index={i} fit={fit} aspect={aspect} />
             ))}
           </div>
         </div>
@@ -1178,7 +1109,7 @@ function PictureRoundRecap({ items, tweaks, accent, pictureRound }) {
 // ============================================================
 // SLIDE: TIEBREAKER INTRO — Final Wager rules (Final Jeopardy style)
 // ============================================================
-function TiebreakerIntroSlide({ tweaks, accent }) {
+function TiebreakerIntroSlide({ accent }) {
   const rules = [
     { n: "I",   t: "Place Your Wager",       d: "Each tied team secretly writes a wager from 0 up to their total score before the question is read." },
     { n: "II",  t: "One Question, One Answer", d: "Hosts read the prompt. Each team writes one answer on their sheet. No conferring." },
@@ -1186,97 +1117,52 @@ function TiebreakerIntroSlide({ tweaks, accent }) {
     { n: "IV",  t: "Up to Three Tries",       d: "Still tied after wagers are settled? We play again with a new question — up to a maximum of three." },
   ];
   return (
-    <section data-label="Tiebreakers · Final Wager">
-      <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
-
-        <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
-          height: "100%", display: "flex", flexDirection: "column",
-        }}>
-          <Eyebrow accentHex={accent.hex}>Sudden Death · Final Wager</Eyebrow>
-          <div style={{
-            fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-            letterSpacing: "0.04em", marginTop: 24, color: PALETTE.paper,
-          }}>
-            TIEBREAKERS
-          </div>
-          <div style={{
-            height: 4, width: 180, background: accent.hex, marginTop: 22,
-            boxShadow: `0 0 16px ${accent.glow}`,
-          }} />
-
-          <div style={{
-            marginTop: 64, display: "grid", gridTemplateColumns: "1fr 1fr",
-            gap: "44px 80px", flex: 1,
-          }}>
-            {rules.map((r) => (
-              <div key={r.n} style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
-                <div style={{
-                  fontFamily: displayFont, fontWeight: 700, fontSize: 80, lineHeight: 0.9,
-                  color: accent.hex, minWidth: 96,
-                  textShadow: `0 0 18px ${accent.glow}`,
-                }}>
-                  {r.n}
-                </div>
-                <div>
-                  <div style={{
-                    fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
-                    letterSpacing: "0.04em", color: PALETTE.paper, marginBottom: 12,
-                  }}>
-                    {r.t}
-                  </div>
-                  <div style={{
-                    fontFamily: "'Inter', sans-serif", fontWeight: 400,
-                    fontSize: TYPE_SCALE.body, lineHeight: 1.35, color: PALETTE.paperDim,
-                    maxWidth: 560,
-                  }}>
-                    {r.d}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <FooterBar left="Final Wager" accentHex={accent.hex} />
-      </div>
-    </section>
+    <RuleGrid
+      label="Tiebreakers · Final Wager"
+      eyebrow="Sudden Death · Final Wager"
+      title="Tiebreakers"
+      rules={rules}
+      footerLeft="Final Wager"
+      footerRight="Only If Tied"
+      accent={accent}
+    />
   );
 }
 
 // ============================================================
 // SLIDE: END
 // ============================================================
-function EndSlide({ tweaks, accent, end }) {
+function EndSlide({ accent, end }) {
   const e = end || {};
   return (
     <section data-label="End">
       <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+        <Frame />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          padding: `96px ${SPACING.paddingX}px ${SPACING.paddingTop}px`,
           height: "100%", display: "flex", flexDirection: "column", justifyContent: "center",
           alignItems: "center", textAlign: "center",
         }}>
-          <Eyebrow accentHex={accent.hex}>End of Game</Eyebrow>
+          <Logo size={110} style={{ marginBottom: 40 }} />
+          <div style={{
+            fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
+            letterSpacing: "0.32em", textTransform: "uppercase", color: accent.hex,
+          }}>
+            End of Game
+          </div>
           {e.hero1 && (
             <div style={{
-              fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
-              color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 36,
-              textShadow: `0 0 50px ${accent.glow}`,
+              fontFamily: heroFont, fontSize: 172, lineHeight: 0.92,
+              textTransform: "uppercase", color: PALETTE.paper, marginTop: 28,
             }}>
               {e.hero1}
             </div>
           )}
           {e.hero2 && (
             <div style={{
-              fontFamily: displayFont, fontWeight: 700, fontSize: 220, lineHeight: 0.9,
-              color: accent.hex, letterSpacing: "0.04em",
-              textShadow: `0 0 50px ${accent.glow}`,
+              fontFamily: heroFont, fontSize: 172, lineHeight: 0.92,
+              textTransform: "uppercase", color: PALETTE.gold,
             }}>
               {e.hero2}
             </div>
@@ -1284,8 +1170,8 @@ function EndSlide({ tweaks, accent, end }) {
 
           {e.subtitle && (
             <div style={{
-              marginTop: 76, fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
-              color: PALETTE.paperDim, letterSpacing: "0.36em",
+              marginTop: 56, fontFamily: displayFont, fontWeight: 600, fontSize: 40,
+              color: `${PALETTE.paper}99`, letterSpacing: "0.28em", textTransform: "uppercase",
             }}>
               {e.subtitle}
             </div>
@@ -1301,51 +1187,56 @@ function EndSlide({ tweaks, accent, end }) {
 // ============================================================
 // SLIDE: NEXT EVENT — announcement for the next trivia night
 // ============================================================
-function NextEventSlide({ tweaks, accent, nextEvent }) {
+function NextEventSlide({ accent, nextEvent }) {
   const e = nextEvent || {};
   return (
     <section data-label="Next Event">
       <div style={slideBase}>
-        <SlideAtmosphere tweaks={tweaks} accent={accent} />
-        <CornerMarks accentHex={accent.hex} />
+        <Frame />
 
         <div style={{
-          padding: `${SPACING.paddingTop}px ${SPACING.paddingX}px ${SPACING.paddingBottom}px`,
+          padding: `96px ${SPACING.paddingX}px ${SPACING.paddingTop}px`,
           height: "100%", display: "flex", flexDirection: "column", justifyContent: "center",
           alignItems: "center", textAlign: "center",
         }}>
-          {e.eyebrow && <Eyebrow accentHex={accent.hex}>{e.eyebrow}</Eyebrow>}
+          {e.eyebrow && (
+            <div style={{
+              fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.meta,
+              letterSpacing: "0.32em", textTransform: "uppercase", color: accent.hex,
+            }}>
+              {e.eyebrow}
+            </div>
+          )}
           {e.hero && (
             <div style={{
-              fontFamily: displayFont, fontWeight: 700, fontSize: 150, lineHeight: 0.95,
-              color: PALETTE.paper, letterSpacing: "0.04em", marginTop: 36,
-              textShadow: `0 0 50px ${accent.glow}`,
+              fontFamily: heroFont, fontSize: 120, lineHeight: 0.96,
+              textTransform: "uppercase", color: PALETTE.paper, marginTop: 28,
             }}>
               {e.hero}
             </div>
           )}
           {e.date && (
             <div style={{
-              marginTop: 48, fontFamily: displayFont, fontWeight: 700, fontSize: TYPE_SCALE.title,
-              color: accent.hex, letterSpacing: "0.06em",
-              textShadow: `0 0 32px ${accent.glow}`,
+              marginTop: 44, fontFamily: displayFont, fontWeight: 700, fontSize: 96,
+              color: accent.hex, letterSpacing: "0.06em", textTransform: "uppercase",
+              textShadow: hardShadow(6),
             }}>
               {e.date}
             </div>
           )}
           {e.venue && (
             <div style={{
-              marginTop: 28, fontFamily: displayFont, fontWeight: 600, fontSize: TYPE_SCALE.subtitle,
-              color: PALETTE.paperDim, letterSpacing: "0.28em", textTransform: "uppercase",
+              marginTop: 26, fontFamily: displayFont, fontWeight: 600, fontSize: 44,
+              color: `${PALETTE.paper}99`, letterSpacing: "0.26em", textTransform: "uppercase",
             }}>
               {e.venue}
             </div>
           )}
           {e.detail && (
             <div style={{
-              marginTop: 56, fontFamily: "'Inter', sans-serif", fontStyle: "italic",
-              fontWeight: 400, fontSize: TYPE_SCALE.body, lineHeight: 1.4,
-              color: PALETTE.paperDim, maxWidth: 1100,
+              marginTop: 48, fontFamily: bodyFont, fontStyle: "italic",
+              fontWeight: 400, fontSize: 34, lineHeight: 1.4,
+              color: `${PALETTE.paper}B3`, maxWidth: 1000,
             }}>
               {e.detail}
             </div>

@@ -65,14 +65,14 @@ The two windows talk via `BroadcastChannel` (channel name `pub-trivia-scaffold` 
 - `src/QuestionSlide` (in `slides.jsx`): tracks `isActive` from `slidechange` events, holds local `seconds` + `paused` state. Only the active slide responds to timer broadcasts and emits `timer:state`. All mounted question slides see the broadcasts but only the active one acts.
 - Display tweaks (question numbers, timer toggle/seconds) are persisted in `meta.display` and edited from the **Display** card in ControlApp's Edit Questions tab — they buffer-and-save and broadcast via `meta:update` like every other meta field. The runtime accent picker and ambient-backdrop toggle were removed: the global accent is now the `DEFAULT_ACCENT` code constant in App.jsx, and the `BackdropField` starfield component was deleted outright. This scaffold no longer depends on Claude Design (the old `tweaks-panel.jsx`, floating host panel, `useTweaks` postMessage protocol, and EDITMODE markers are long gone).
 - `DEFAULT_ACCENT` + `ROUND_ACCENTS` (in `App.jsx`, near the top) are the accent controls. `DEFAULT_ACCENT` is the global accent (an `ACCENTS` key; themed forks set their signature color here). `ROUND_ACCENTS` is a per-round rotation hook: empty map in the scaffold; themed forks fill it in to map round number `n` → ACCENTS key. The `accentFor(n, global)` helper degrades to the global accent for any round not in the map, so the scaffold runs unchanged with the empty default — and since hosts can now add/remove rounds at runtime (which renumbers `n`), a stale map is cosmetic, never breaking. Picture round (R1) + title/rules/prize/costume/end/nextEvent stay on the global accent regardless of `ROUND_ACCENTS`.
-- `slides.jsx` is the design system: typography scale, accents, atmospheric overlays (`HalftoneOverlay`, `GrainOverlay`, `Vignette`), and slide components. Inline styles only — no CSS files. The `AccentBar` component is a glowing horizontal bar with a centered diamond ornament (theme-neutral). Themed forks routinely replace it with a theme emblem. `NextEventSlide` is pure layout — its copy lives in `meta.js`'s `nextEvent` defaults.
-- **Visual identity is a first-class theme dimension.** Themed forks should expect to swap fonts (display + body + mono), emblem (`AccentBar` → Pokeball / Eye / Saber / etc.), and per-round accent rotation in addition to palette + copy.
-- **Translucent overlays use alpha-hex on PALETTE tokens** rather than literal `rgba(...)`. Patterns like `${PALETTE.paper}1F` (12%) or `${PALETTE.paper}D9` (85%) keep Vignette, picture captions, subtle borders, and step-card tints tracking palette swaps automatically.
+- `slides.jsx` is the design system: typography scale, accents, shared layout components, and slide components. Inline styles only — no CSS files. The look is **pulp-poster** (from the "Pub trivia scaffold refresh" Claude Design project): flat solid surfaces, hard offset shadows (`hardShadow(px, color)` — no glows), an inset `Frame` border on every slide, and red-background feature slides (Prize, Round Openers, Intermissions — `slideSurface("red")`; `Frame`/`FooterBar` take a matching `variant="red"` for stronger alpha + navy dots). Three font constants: `heroFont` (Alfa Slab One — hero lines), `displayFont` (Oswald — headings/labels), `bodyFont` (Work Sans — body copy); all three load from Google Fonts in `index.html`. `RuleGrid` is the shared 2×2 layout behind RulesSlide / CostumeContestSlide / TiebreakerIntroSlide (copy stays in each slide — theme anchors). The `AccentBar` component is a flat diamond divider — two lines flanking a rotated square with the `inkDeep` pulp outline (theme-neutral). Themed forks routinely replace it with a theme emblem. `Logo` renders the venue mark from `public/logo-fgbc-red.png` on Title/End (`onError` hides a missing file cleanly, so forks can just delete the PNG). `NextEventSlide` is pure layout — its copy lives in `meta.js`'s `nextEvent` defaults.
+- **Visual identity is a first-class theme dimension.** Themed forks should expect to swap fonts (hero + display + body — the `index.html` fonts link and the three font constants in `slides.jsx` together), emblem (`AccentBar` → Pokeball / Eye / Saber / etc.), the venue logo PNG, and per-round accent rotation in addition to palette + copy.
+- **Translucent surfaces use alpha-hex on PALETTE tokens** rather than literal `rgba(...)`. Patterns like `${PALETTE.paper}29` (16% — Frame borders), `${PALETTE.paper}99` (60% — dimmed text), or `${PALETTE.inkDeep}D9` (85% — caption gradient) keep frames, hairlines, picture captions, and step-card tints tracking palette swaps automatically.
 - All slide components stay mounted with `visibility: hidden` so input/timer/video state survives navigation.
 
 ## PALETTE naming convention
 
-`PALETTE.ink` is **the slide background color** and `PALETTE.paper` is **the primary text color** — regardless of which is light or which is dark. The scaffold has shipped both light-bg/dark-text (current) and dark-bg/light-text under the same key names. Themed forks invert the *values* but keep the *keys*; downstream styles like `slideBase` (`color: PALETTE.paper, background: PALETTE.ink`) don't change.
+`PALETTE.ink` is **the slide background color** and `PALETTE.paper` is **the primary text color** — regardless of which is light or which is dark. The scaffold has shipped both light-bg/dark-text and dark-bg/light-text (current: navy bg `#1A2A4A` / cream text `#F2E8CF`) under the same key names. Themed forks invert the *values* but keep the *keys*; downstream styles like `slideBase` (`color: PALETTE.paper, background: PALETTE.ink`) don't change. The full key set is now seven: `ink`, `inkDeep` (near-black outline + hard-shadow token), `paper`, `paperDim`, `rust` (structural red — rule bars, red-bg slides, chips), `rustDeep` (question-number shadow), `gold` (highlight — the scaffold's `DEFAULT_ACCENT` points at the matching ACCENTS entry).
 
 ## Slide outline duplication
 
@@ -93,19 +93,20 @@ The two windows talk via `BroadcastChannel` (channel name `pub-trivia-scaffold` 
 | `src/rounds.js` | full `DEFAULT_TIEBREAKERS` array (real numeric prompts + answer comment) | tiebreaker content |
 | `src/pictures.js` | `'pub-trivia-scaffold.pictures'` | localStorage key |
 | `src/meta.js` | `'pub-trivia-scaffold.meta'` | localStorage key |
-| `src/meta.js` `DEFAULT_META.title` | `eyebrow`, `hero`, `edition`, `hosts`, `footerDate` | title slide defaults — host can override at runtime via Edit Questions tab |
+| `src/meta.js` `DEFAULT_META.title` | `eyebrow`, `hero` (blank by default — optional line, rendered only when non-empty), `edition`, `hosts`, `footerDate` | title slide defaults — host can override at runtime via Edit Questions tab |
 | `src/meta.js` `DEFAULT_META.end` | `hero1`, `hero2`, `subtitle` | end slide defaults — host can override at runtime |
 | `src/meta.js` `DEFAULT_META.nextEvent` | `eyebrow`, `hero`, `date`, `venue`, `detail` | next-event slide defaults — theme only if a fitting metaphor exists; host edits per event |
 | `src/meta.js` `DEFAULT_META.pictureRound` | `fit` (`'cover'`/`'contain'`) + `aspect` (`PICTURE_ASPECTS` key) | picture-cell defaults — a flag-style sibling can ship `fit: 'contain', aspect: '3 / 2'`; host can also flip at runtime via the Picture Round card |
-| `src/slides.jsx` | full `PALETTE` object values (keys stay) | palette |
-| `src/slides.jsx` TitleSlide | `TRIVIA NIGHT` (92px tagline, hardcoded) — the WELCOME / EDITION strings now live in `meta.js` defaults | title slide |
+| `src/slides.jsx` | full `PALETTE` object values (7 keys — `ink`/`inkDeep`/`paper`/`paperDim`/`rust`/`rustDeep`/`gold`; keys stay) | palette |
+| `src/slides.jsx` TitleSlide | `TRIVIA NIGHT` (64px tagline under the edition hero, hardcoded) — the HERO / EDITION strings live in `meta.js` defaults | title slide |
 | `src/slides.jsx` RulesSlide | rules I–IV `d` text | rules |
 | `src/slides.jsx` CostumeContestSlide | rule I–IV body copy | costume contest |
 | `src/slides.jsx` PictureRoundInstructions | step 03 `d` text | picture-round instructions |
 | `src/slides.jsx` `AccentBar` | optional rename + visual swap (rename hits 3 sites: definition + 2 call sites) | divider component |
+| `src/slides.jsx` `Logo` + `public/logo-fgbc-red.png` | replace the PNG (or delete it — `onError` hides it) + update the `alt="Fertile Ground Beer Co"` | venue logo on Title/End |
 | `src/slides.jsx` `ACCENTS` values | tune `hex`/`glow` per theme; keys (`accent-blue` etc.) stay verbatim | accent color tuning |
 | `src/App.jsx` | Round 1 opener subtitle | picture-round flavor |
-| `src/App.jsx` | `DEFAULT_ACCENT = "accent-red"` | global accent — set to the theme's signature ACCENTS key |
+| `src/App.jsx` | `DEFAULT_ACCENT = "accent-gold"` | global accent — set to the theme's signature ACCENTS key |
 | `src/ControlApp.jsx` | `'Thanks for Playing'` (fallback in `buildSlideOutline` when `meta.end.hero1`+`hero2` are blank) | end-slide outline label fallback |
 | `src/ControlApp.jsx` | `` `trivia-questions-${date}.json` `` / `` `trivia-questions-${date}.csv` `` | export filenames |
 | `package.json` | `"pub-trivia-scaffold"` (name) | package name |
@@ -115,7 +116,7 @@ The internal `ACCENTS` keys (`accent-blue`, `accent-green`, `accent-red`, `accen
 
 ## Lint warnings
 
-`npm run lint` exits clean (zero errors) but reports 7 warnings in handoff design code (unused destructured props in `slides.jsx` — `SlideAtmosphere`'s `tweaks`/`accent` and `CornerMarks`' extension points, empty catches in `deck-stage.js`). These are intentional design-system extension points and defensive code. Don't suppress globally; address case-by-case if cleanup is desired.
+`npm run lint` exits clean (zero errors) but reports 2 warnings (empty catches in `deck-stage.js`). These are intentional defensive code. Don't suppress globally; address case-by-case if cleanup is desired. Note: `App.jsx` still passes `tweaks`/`accent` to every slide, but only the components that consume them destructure them — if you re-add a consumer (e.g. an atmosphere overlay), just re-destructure the prop.
 
 ## Content (scaffold defaults)
 
