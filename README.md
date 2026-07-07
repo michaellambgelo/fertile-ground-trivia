@@ -61,18 +61,19 @@ A live outline of every slide in the deck with the active slide highlighted. Cli
 ### 2. Edit Questions tab
 Cards at the top edit the **Title Slide**, **End Slide**, and **Next Event Slide** strings (eyebrow, hero text, edition, hosts, date, sign-off, next-event details). Below that, cards per round let you edit each question and answer — plus restructure the game: **add/remove questions** within a round (the "N Questions" kicker tracks the count automatically), and **add/remove whole rounds**. Edits are buffered locally — "Save & Push to Display" sends them to the display (and persists to `localStorage`), "Revert" discards.
 
-Bulk editing goes through **Export JSON / Export CSV / Import…**: JSON is the lossless round-trip format; CSV (`round,round_title,question,answer,subtitle,kicker`, with `TB` rows for tiebreakers) is spreadsheet-friendly — round count and questions-per-round are detected from the rows. The older `category,question` writer-template CSV still works and opens a category→round mapping dialog on import.
+Bulk editing goes through **Export Deck / Export CSV / Import…**: **Export Deck** is the lossless round-trip format — one JSON file carrying the questions, tiebreakers, picture round (images included), and all game meta, so importing it on another machine restores the whole event; CSV (`round,round_title,question,answer,subtitle,kicker`, with `TB` rows for tiebreakers) is spreadsheet-friendly — round count and questions-per-round are detected from the rows. The older `category,question` writer-template CSV still works and opens a category→round mapping dialog on import.
 
 The **Slides to Include** card has the toggle switches that hide/show Prize, Costume Contest, Picture Round, Next Event, and Tiebreakers in the deck.
 
 ### 3. Picture Round tab
 The picture round (Round 1) needs ten themed images. The workflow:
 
-1. Click a numbered cell, then **⌘V (Mac) / Ctrl+V** to paste an image from your clipboard. Drag-and-drop a file onto the cell also works. Pastes save to `localStorage` immediately, so the display updates live.
+1. Click a numbered cell, then **⌘V (Mac) / Ctrl+V** to paste an image from your clipboard. Drag-and-drop a file onto the cell also works. Images are automatically downscaled and recompressed on the way in (so a full-resolution phone photo won't blow the browser's storage quota), saved to `localStorage`, and pushed to the display live.
 2. **Crop / re-frame** — once an image is in a cell, drag it to pan the visible crop. The ↺ button next to a cell resets the crop to centered.
 3. **Copy Handout to Clipboard** — copies a 1920×1080 print-friendly PNG (white background, dark borders, "PICTURE ROUND" title) for pasting into Word / Pages / email so the room can play with paper sheets.
 4. **Download Handout PNG** — same image as a file.
-5. **Save Images to Disk** — downloads each pasted image with predictable names (`picture-01.png` … `picture-10.png`). Drop them into `public/images/` so the display serves them statically and you can clear the localStorage paste buffer.
+
+Pictures travel with the deck: **Export Deck** on the Edit Questions tab bundles them (with the questions and game meta) into one JSON file, and **Import…** on another machine restores them instantly.
 
 ## Casting the display to a TV / projector
 

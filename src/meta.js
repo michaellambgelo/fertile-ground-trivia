@@ -106,6 +106,12 @@ function withDefaults(parsed) {
   };
 }
 
+// Coerce an untrusted meta object (imported deck bundle) to the current
+// schema — same merge/validation path persisted saves go through.
+export function sanitizeMeta(parsed) {
+  return withDefaults(parsed);
+}
+
 export function loadMeta() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);

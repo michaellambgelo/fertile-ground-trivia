@@ -1,24 +1,23 @@
 // Picture Round data + paste-buffer persistence.
 //
-// Workflow: user pastes images in the control window → we store as data URLs
-// in localStorage as a temporary scratch buffer. A "Save All to Disk" button
-// downloads them as picture-01.png ... picture-10.png so the user can drop
-// them into public/images/ — at which point the static paths take over and
-// localStorage can be cleared.
+// Workflow: user pastes images in the control window → ingestImage downscales
+// and re-encodes them (so ten photos fit localStorage's ~5MB quota with room
+// to spare) → data URLs persist in localStorage. The deck bundle export
+// ("Export Deck" in the Edit Questions tab) carries the pictures along with
+// the questions, so a deck moves between machines as a single JSON file.
 
 const COUNT = 10;
+export const PICTURE_COUNT = COUNT;
 const STORAGE_KEY = 'pub-trivia-scaffold.pictures';
 
-// Static defaults — point to the predictable on-disk paths the editor's
-// "Save All to Disk" button writes to. If the file isn't there yet, the
-// <img> 404s and the slide falls back to the placeholder.
+// Static fallbacks — predictable on-disk paths under public/images/. Decks
+// that commit images there (e.g. deployed themed forks) get them served
+// statically; otherwise the <img> 404s and the slide falls back to the
+// placeholder. Pasted images always win over these.
 export const DEFAULT_PICTURE_ITEMS = Array.from({ length: COUNT }, (_, i) => ({
   src: `${import.meta.env.BASE_URL}images/picture-${String(i + 1).padStart(2, '0')}.png`,
   caption: null,
 }));
-
-export const PICTURE_FILENAME = (i) =>
-  `picture-${String(i + 1).padStart(2, '0')}.png`;
 
 // Picture-round cell geometry — single source of truth shared by the display
 // slide (slides.jsx), the canvas handout (handout.js), and the editor preview
@@ -75,6 +74,13 @@ function normalizePaste(p) {
   };
 }
 
+// Normalize an arbitrary array (older saves, imported bundles) to exactly
+// COUNT well-shaped entries — pads short arrays, drops extras.
+export function normalizePastes(arr) {
+  const list = Array.isArray(arr) ? arr : [];
+  return Array.from({ length: COUNT }, (_, i) => normalizePaste(list[i]));
+}
+
 // Returns 10 entries: { dataUrl, caption, position: {x, y} }
 export function loadPastes() {
   try {
@@ -91,8 +97,49 @@ export function loadPastes() {
   return Array.from({ length: COUNT }, () => normalizePaste(null));
 }
 
+// Persist the paste buffer. Returns false when the write fails (in practice:
+// QuotaExceededError) so callers can warn instead of dying mid-handler —
+// the in-memory state and the display broadcast still carry the image for
+// the session either way.
 export function savePastes(pastes) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(pastes));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pastes));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Downscale + re-encode a pasted/dropped image so the 10-slot buffer stays
+// comfortably inside the localStorage quota. Long edge caps at `maxEdge`
+// (cells render at ~350px on a 1080p slide, so 1600px keeps generous crop
+// headroom) and output is JPEG — photographic sources shrink ~10-50×; the
+// alpha channel is flattened onto white. Falls back to the original bytes
+// only if decoding fails (corrupt/unsupported source).
+export async function ingestImage(blob, { maxEdge = 1600, quality = 0.85 } = {}) {
+  const readAsDataUrl = () => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Could not read image.'));
+    reader.readAsDataURL(blob);
+  });
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';           // flatten transparency onto white
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch {
+    return readAsDataUrl();
+  }
 }
 
 export function clearPastes() {
