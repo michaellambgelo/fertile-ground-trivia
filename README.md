@@ -1,18 +1,19 @@
 # Pub Trivia Scaffold
 
-The source-of-truth for browser-only **pub trivia** presentation decks — and a hostable **General Trivia** deck in its own right. Teams play across rounds of questions on written paper sheets, hosts grade per round. Plus an optional picture round (10 images, played from a handout), optional tiebreakers, and a next-event announcement slide. For *themed* events, run the `/new-pub-trivia-deck` Claude Code skill to clone this scaffold into a `~/Workspace/<slug>-trivia` sibling repo and re-skin it with theme content (real questions, themed slide copy, theme palette).
+The source-of-truth for browser-only **pub trivia** presentation decks — and a hostable **General Trivia** deck in its own right. Teams play across rounds of questions on written paper sheets, hosts grade per round. Plus an optional picture round (10 images, played from a handout), optional tiebreakers, and a next-event announcement slide.
 
 The deck ships ready to host: 4 rounds × 10 real general-knowledge questions under a "GENERAL TRIVIA" title slide, with the round count and questions-per-round fully editable from the control window (or via CSV import).
 
-## Quick start
+Two audiences, two halves of this document:
 
-```bash
-npm install
-npm run dev      # localhost:5173
-npm run build    # production bundle in dist/
-npm run preview  # serve dist/ for verification
-npm run lint     # ESLint
-```
+- **[Instructions for Hosts](#instructions-for-hosts)** — running an event: the two windows, game flow, the control tabs, casting to a TV.
+- **[Instructions for Developers](#instructions-for-developers)** — building, deploying, the file layout, and how themed decks are produced.
+
+---
+
+# Instructions for Hosts
+
+## The two windows
 
 The deck has **two URLs** that you open in two separate browser windows on the same origin:
 
@@ -20,6 +21,8 @@ The deck has **two URLs** that you open in two separate browser windows on the s
 |---|---|---|
 | `http://localhost:5173/` | **Display** | The TV / projector / external screen the room watches |
 | `http://localhost:5173/#/control` | **Control** | Your laptop screen — editor + presenter view |
+
+(Swap in the deployed URL if you're hosting from the published site rather than a local dev server.)
 
 The two windows talk live via `BroadcastChannel` (a built-in browser API; no server). Edits in the control window push to the display instantly; navigating in control drives the display.
 
@@ -36,20 +39,7 @@ A typical event flows through this slide order:
 7. **Next Event** *(optional)* — announces the next trivia night (date / venue / detail, edited per event).
 8. **Tiebreakers** *(optional)* — parked at the very end of the deck; advance into them only when there's an actual tie.
 
-Anything from #3 onward (prize / costume / picture round / next event / tiebreakers) can be hidden per-event from the control window's **Edit Questions → Slides to Include** card so a single deck handles "full event" and "casual game night" formats without code changes.
-
-### Display keyboard shortcuts
-
-If you want to drive the deck directly from the display window (no control window connected), all of these work:
-
-- **← / →**, **Space**, **PgUp / PgDn** — previous / next slide
-- **Home / End** — first / last slide
-- **Number keys 1–9** — jump to slide N (10s of slides need the control window)
-- **R** — reset to slide 0
-- **Click left/right third of the screen** — back / forward (handy from a phone)
-- **Browser Print → Save as PDF** — exports one slide per page at 1920×1080
-
-Most events drive navigation from the control window instead, so the host can see "what's next" before the room does.
+Anything from #3 onward (prize / costume / picture round / next event / tiebreakers) can be hidden per-event from the control window's **Edit Questions → Slides to Include** card, so a single deck handles "full event" and "casual game night" formats without code changes.
 
 ## Control mode
 
@@ -75,13 +65,38 @@ The picture round (Round 1) needs ten themed images. The workflow:
 
 Pictures travel with the deck: **Export Deck** on the Edit Questions tab bundles them (with the questions and game meta) into one JSON file, and **Import…** on another machine restores them instantly.
 
+## Display keyboard shortcuts
+
+If you want to drive the deck directly from the display window (no control window connected), all of these work:
+
+- **← / →**, **Space**, **PgUp / PgDn** — previous / next slide
+- **Home / End** — first / last slide
+- **Number keys 1–9** — jump to slide N (10s of slides need the control window)
+- **R** — reset to slide 0
+- **Click left/right third of the screen** — back / forward (handy from a phone)
+- **Browser Print → Save as PDF** — exports one slide per page at 1920×1080
+
+Most events drive navigation from the control window instead, so the host can see "what's next" before the room does.
+
 ## Casting the display to a TV / projector
 
 Same as any web page: HDMI cable, AirPlay, Chromecast, Miracast, or OBS Browser Source at 1920×1080. The deck auto-scales the 1920×1080 stage to whatever resolution the external display reports, so fullscreen the display window once and you're done.
 
-## How themed decks are produced
+---
 
-The `/new-pub-trivia-deck` skill clones this scaffold to `~/Workspace/<slug>-trivia` and swaps every theme-leak point (palette, slide copy, BroadcastChannel name, localStorage keys, package name), then re-fills `DEFAULT_ROUNDS` with real themed trivia questions per round.
+# Instructions for Developers
+
+## Quick start
+
+```bash
+npm install
+npm run dev      # localhost:5173
+npm run build    # production bundle in dist/
+npm run preview  # serve dist/ for verification
+npm run lint     # ESLint
+```
+
+Stack: React 18 + JSX (no TypeScript, by intent) + Vite 5, plus a custom `<deck-stage>` web component (vanilla JS) that handles slide layout, navigation, 1920×1080 auto-scaling, and print. Inline styles only — no CSS files.
 
 ## Structure
 
@@ -99,3 +114,23 @@ src/
 ├── deck-stage.js       custom element (vanilla JS) — handles 1920×1080 auto-scale
 └── slides.jsx          slide components + design system
 ```
+
+`src/main.jsx` reads `window.location.hash` and renders display (`/`) or control (`/#/control`); a `hashchange` listener forces a full reload so each mode boots cleanly. The two windows exchange nav, content, and timer messages over `BroadcastChannel` — see `src/broadcast.js` and the message-type table in `CLAUDE.md`.
+
+Two duplication points to know about: `ControlApp.jsx`'s `buildSlideOutline()` mirrors `App.jsx`'s slide composition by hand (add a slide in one, update the other), and the picture-round cell geometry is centralized in `pictures.js` so the slide, the canvas handout, and the editor preview crop identically.
+
+## How themed decks are produced
+
+The `/new-pub-trivia-deck` Claude Code skill clones this scaffold to `~/Workspace/<slug>-trivia` and swaps every theme-leak point (palette, slide copy, BroadcastChannel name, `localStorage` keys, package name, Vite `base`), then re-fills `DEFAULT_ROUNDS` with real themed trivia questions per round.
+
+Because the skill edits **exact anchor strings**, changing them casually will silently break it. The authoritative anchor table lives in `CLAUDE.md` — read it before renaming constants, palette keys, storage keys, or slide copy.
+
+## Deploy
+
+Auto-deploys to GitLab Pages via `.gitlab-ci.yml` on every push to `main`. The subpath base is `/pub-trivia-scaffold/` (set in `vite.config.js`); image fallbacks in `src/pictures.js` use `import.meta.env.BASE_URL` so they resolve in both dev (`/`) and prod. Live at `https://michaellambgelo.gitlab.io/pub-trivia-scaffold/`.
+
+The `/#/control` route is intentionally ungated: every visitor's browser gets its own isolated `localStorage`, so writes only ever land in that visitor's own browser and every fresh session loads the `DEFAULT_*` content.
+
+## Further reading
+
+`CLAUDE.md` in this repo is the deep architectural reference — broadcast message types, the import/export formats, the palette naming convention, per-module notes, and the anchor strings the skill replaces.
