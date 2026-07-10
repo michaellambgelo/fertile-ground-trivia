@@ -1,8 +1,10 @@
-# Pub Trivia Scaffold
+# Fertile Ground Trivia
 
-The source-of-truth for browser-only **pub trivia** presentation decks — and a hostable **General Trivia** deck in its own right. Teams play across rounds of questions on written paper sheets, hosts grade per round. Plus an optional picture round (10 images, played from a handout), optional tiebreakers, and a next-event announcement slide.
+The browser-only presentation deck for **Taproom Trivia at Fertile Ground**. Teams play across rounds of questions on written paper sheets, hosts grade per round. Plus an optional picture round (10 images, played from a handout), optional tiebreakers, and a next-event announcement slide.
 
-The deck ships ready to host: 4 rounds × 10 real general-knowledge questions under a "GENERAL TRIVIA" title slide, with the round count and questions-per-round fully editable from the control window (or via CSV import).
+The deck ships ready to host: 4 rounds × 10 real general-knowledge questions, with the round count and questions-per-round fully editable from the control window (or via CSV import).
+
+Forked from [`pub-trivia-scaffold`](https://gitlab.com/michaellambgelo/pub-trivia-scaffold), which remains the source-of-truth scaffold that `/new-pub-trivia-deck` clones. This repo is the live Fertile Ground deck — not a scaffold.
 
 Two audiences, two halves of this document:
 
@@ -119,18 +121,20 @@ src/
 
 Two duplication points to know about: `ControlApp.jsx`'s `buildSlideOutline()` mirrors `App.jsx`'s slide composition by hand (add a slide in one, update the other), and the picture-round cell geometry is centralized in `pictures.js` so the slide, the canvas handout, and the editor preview crop identically.
 
-## How themed decks are produced
+## Relationship to the scaffold
 
-The `/new-pub-trivia-deck` Claude Code skill clones this scaffold to `~/Workspace/<slug>-trivia` and swaps every theme-leak point (palette, slide copy, BroadcastChannel name, `localStorage` keys, package name, Vite `base`), then re-fills `DEFAULT_ROUNDS` with real themed trivia questions per round.
+This deck was forked from `pub-trivia-scaffold` and keeps its engine, but it is **not** a scaffold: `/new-pub-trivia-deck` should never target this repo. Fertile Ground branding — the palette in `src/slides.jsx`, the venue logo `public/logo-fgbc-red.png`, and the slide copy — is the product here, not a theme-leak to be replaced.
 
-Because the skill edits **exact anchor strings**, changing them casually will silently break it. The authoritative anchor table lives in `CLAUDE.md` — read it before renaming constants, palette keys, storage keys, or slide copy.
+Engine fixes worth sharing flow back to the scaffold on GitLab by hand; there is no automatic sync.
 
 ## Deploy
 
-Auto-deploys to GitLab Pages via `.gitlab-ci.yml` on every push to `main`. The subpath base is `/pub-trivia-scaffold/` (set in `vite.config.js`); image fallbacks in `src/pictures.js` use `import.meta.env.BASE_URL` so they resolve in both dev (`/`) and prod. Live at `https://michaellambgelo.gitlab.io/pub-trivia-scaffold/`.
+Auto-deploys to **Cloudflare Pages** on every push to `main` via the GitHub git integration — build command `npm run build`, output directory `dist`, production branch `main`. Live at `https://fertile-ground-trivia.pages.dev`. Pull requests get preview deployments automatically.
+
+`npm run deploy` isn't a thing; use `/deploy` (or `bash scripts/deploy.sh`), which pushes `main` and lets Cloudflare build. The Vite `base` is `/` because Pages serves from the domain root; image fallbacks in `src/pictures.js` use `import.meta.env.BASE_URL` so they resolve in both dev and prod. `.node-version` pins the Pages build image to Node 20.
 
 The `/#/control` route is intentionally ungated: every visitor's browser gets its own isolated `localStorage`, so writes only ever land in that visitor's own browser and every fresh session loads the `DEFAULT_*` content.
 
 ## Further reading
 
-`CLAUDE.md` in this repo is the deep architectural reference — broadcast message types, the import/export formats, the palette naming convention, per-module notes, and the anchor strings the skill replaces.
+`CLAUDE.md` in this repo is the deep architectural reference — broadcast message types, the import/export formats, the palette naming convention, and per-module notes.

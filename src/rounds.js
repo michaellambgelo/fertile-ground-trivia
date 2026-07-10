@@ -3,8 +3,8 @@
 
 import { parseCsv } from './csv.js';
 
-const STORAGE_KEY = 'pub-trivia-scaffold.rounds';
-const TIEBREAKER_STORAGE_KEY = 'pub-trivia-scaffold.tiebreakers';
+const STORAGE_KEY = 'fertile-ground-trivia.rounds';
+const TIEBREAKER_STORAGE_KEY = 'fertile-ground-trivia.tiebreakers';
 
 export const TIEBREAKER_COUNT = 3;
 
@@ -203,7 +203,7 @@ export function isAutoKicker(kicker) {
 // (the 10-slot picture-round buffer, data URLs included) and `meta` (full
 // game meta). Version 1 files (questions + tiebreakers only) still import.
 
-export const QUESTIONS_EXPORT_TYPE = 'pub-trivia-scaffold/questions';
+export const QUESTIONS_EXPORT_TYPE = 'fertile-ground-trivia/questions';
 export const QUESTIONS_EXPORT_VERSION = 2;
 
 // `extras` carries the optional bundle sections: pass { pictures, meta } to
@@ -232,7 +232,7 @@ export function parseQuestionsImport(text) {
     throw new Error('Expected a JSON object at the top level.');
   }
   if (data.type !== QUESTIONS_EXPORT_TYPE) {
-    throw new Error('Not a Pub Trivia Scaffold questions export (wrong "type").');
+    throw new Error('Not a Fertile Ground Trivia questions export (wrong "type").');
   }
   if (!Array.isArray(data.rounds) || data.rounds.length === 0) {
     throw new Error('"rounds" must be a non-empty array.');

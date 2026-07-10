@@ -5,7 +5,7 @@
 
 import { PICTURE_FITS, PICTURE_ASPECTS } from './pictures.js';
 
-const STORAGE_KEY = 'pub-trivia-scaffold.meta';
+const STORAGE_KEY = 'fertile-ground-trivia.meta';
 
 export const DEFAULT_META = {
   title: {
