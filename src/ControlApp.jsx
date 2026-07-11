@@ -54,6 +54,17 @@ function useNarrowLayout() {
   return narrow;
 }
 
+// A CSV import replaces the whole question set silently otherwise — the draft
+// swaps out with no visible acknowledgement. Spell out what landed so the host
+// can tell a successful import from a no-op.
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+function describeImport({ rounds, tiebreakers }) {
+  const questions = rounds.reduce((sum, r) => sum + r.questions.length, 0);
+  const parts = [plural(rounds.length, 'round'), plural(questions, 'question')];
+  if (tiebreakers) parts.push(plural(tiebreakers.length, 'tiebreaker'));
+  return `Imported ${parts.join(' · ')}.`;
+}
+
 // ============================================================
 // CONTROL APP
 // ============================================================
@@ -545,43 +556,52 @@ function EditorPanel({ rounds, tiebreakers, meta, pastes, commitRounds, commitTi
 
   const onImportClick = () => fileInputRef.current?.click();
 
+  // The one place an import lands, whatever the source. Today that's only the
+  // file picker; a pasted payload or a URL param would call straight into this
+  // rather than reimplementing the per-kind branching and drifting from it.
+  const applyImport = (text, filename) => {
+    try {
+      const result = parseImport(text, filename);
+      if (result.kind === 'json') {
+        setDraft(result.rounds);
+        // Absent tiebreakers mean "keep the deck's current ones". Writing
+        // undefined here would strand the draft: buildQuestionsExport does
+        // [...tiebreakers] on the next export, and the editor .maps over it.
+        if (result.tiebreakers) setDraftTiebreakers(result.tiebreakers);
+        if (result.meta) setDraftMeta(sanitizeMeta(result.meta));
+        setDirty(true);
+        // Pictures have no draft stage — the Picture Round panel always
+        // commits live — so a bundle's pictures land immediately while the
+        // question/meta edits above wait for Save & Push.
+        if (result.pictures) {
+          const restored = normalizePastes(result.pictures);
+          const saved = commitPastes(restored);
+          const count = restored.filter((p) => p.dataUrl).length;
+          setImportNote(
+            `Deck imported — ${count} picture${count === 1 ? '' : 's'} restored${saved ? '' : ' (storage full: pictures won’t survive a reload)'}. Review, then Save & Push.`
+          );
+        } else {
+          setImportNote('Questions imported. Review, then Save & Push.');
+        }
+      } else if (result.kind === 'csv-full') {
+        setDraft(result.rounds);
+        if (result.tiebreakers) setDraftTiebreakers(result.tiebreakers);
+        setDirty(true);
+        setImportNote(`${describeImport(result)} Review, then Save & Push.`);
+      } else {
+        setCsvImport({ categories: result.categories, buckets: result.buckets });
+      }
+    } catch (err) {
+      alert(`Import failed: ${err.message}`);
+    }
+  };
+
   const onImportFile = (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const result = parseImport(reader.result, file.name);
-        if (result.kind === 'json') {
-          setDraft(result.rounds);
-          setDraftTiebreakers(result.tiebreakers);
-          if (result.meta) setDraftMeta(sanitizeMeta(result.meta));
-          setDirty(true);
-          // Pictures have no draft stage — the Picture Round panel always
-          // commits live — so a bundle's pictures land immediately while the
-          // question/meta edits above wait for Save & Push.
-          if (result.pictures) {
-            const restored = normalizePastes(result.pictures);
-            const saved = commitPastes(restored);
-            const count = restored.filter((p) => p.dataUrl).length;
-            setImportNote(
-              `Deck imported — ${count} picture${count === 1 ? '' : 's'} restored${saved ? '' : ' (storage full: pictures won’t survive a reload)'}. Review, then Save & Push.`
-            );
-          } else {
-            setImportNote('Questions imported. Review, then Save & Push.');
-          }
-        } else if (result.kind === 'csv-full') {
-          setDraft(result.rounds);
-          if (result.tiebreakers) setDraftTiebreakers(result.tiebreakers);
-          setDirty(true);
-        } else {
-          setCsvImport({ categories: result.categories, buckets: result.buckets });
-        }
-      } catch (err) {
-        alert(`Import failed: ${err.message}`);
-      }
-    };
+    reader.onload = () => applyImport(reader.result, file.name);
     reader.onerror = () => alert('Could not read file.');
     reader.readAsText(file);
   };
