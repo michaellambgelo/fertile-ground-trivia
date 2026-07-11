@@ -55,6 +55,22 @@ Cards at the top edit the **Title Slide**, **End Slide**, and **Next Event Slide
 
 Bulk editing goes through **Export Deck / Import…**: **Export Deck** is the one export — a JSON file carrying the questions, tiebreakers, picture round (images included), and all game meta, so importing it on another machine restores the whole event. Import also accepts spreadsheet CSVs (`round,round_title,question,answer,subtitle,kicker`, with `TB` rows for tiebreakers) — round count and questions-per-round are detected from the rows — and the older `category,question` writer-template CSV, which opens a category→round mapping dialog.
 
+#### Writing questions in a spreadsheet
+
+Most questions get drafted in a spreadsheet before the event rather than typed in here. Two buttons seed one:
+
+- **Google Sheets Template ↗** opens Google's *Make a copy* dialog on the shared template. The writer gets their **own private copy** — nobody else can see it, including you, unless they share it back. Hand this button (or the link behind it) to anyone writing questions.
+- **CSV Template** downloads the same thing as a file, for Excel or Numbers.
+
+The writer fills in the rows, then `File → Download → Comma-separated values`, and you drop that file into **Import…**. Round count and questions-per-round are read from the rows; the import reports what it loaded, and lands in the editor as unsaved changes so you can review before **Save & Push**.
+
+Two things to know:
+
+- **Sheets exports only the active tab.** Keep the template to one tab.
+- **Never publish a sheet that has real questions in it.** *File → Share → Publish to web* makes it readable by anyone on the internet, and it is not the same as link-sharing. The template is safe to share because it holds no questions; the writers' copies are private by default. Leave it that way.
+
+To rebuild the shared template from scratch: click **CSV Template**, then in a new Sheet use `File → Import → Upload → Replace spreadsheet`. Share it *Anyone with the link → Viewer* and put its file ID (from the `/d/<ID>/edit` URL — **not** a `2PACX-…` publish token) in `SHEET_TEMPLATE_ID` in `src/ControlApp.jsx`.
+
 The **Slides to Include** card has the toggle switches that hide/show Prize, Costume Contest, Picture Round, Next Event, and Tiebreakers in the deck.
 
 ### 3. Picture Round tab

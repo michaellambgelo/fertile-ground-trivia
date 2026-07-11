@@ -307,17 +307,22 @@ export function buildCsvTemplate() {
     line.includes(',') || line.includes('"')
       ? `"${line.replace(/"/g, '""')}"`
       : line;
+  // No comment line may contain a comma. A quoted comment cell defeats Google
+  // Sheets' "Detect automatically" separator guess — it mis-splits the file and
+  // the data rows land in a single column as literal text, which is unusable as
+  // a writer template and won't re-import. Keeping every comment comma-free
+  // means the file imports correctly whatever separator setting is chosen.
   const comments = [
     '# TAPROOM TRIVIA — QUESTION TEMPLATE',
     '',
+    '# Type your questions in the rows below the header.',
     '# Rows starting with # are ignored on import — leave them or delete them.',
-    '# Only `round` and `question` are required; the other columns may be left blank.',
-    '# `round` is a grouping key (1, 2, 3…), not the on-screen round number:',
-    '#   every row sharing a round number becomes one round, in numeric order.',
-    '# `round_title`, `subtitle` and `kicker` are per-round — the first non-empty',
-    '#   value in each round wins; a blank kicker is filled in automatically.',
-    '# Put TB in the round column for sudden-death tiebreakers — exactly 3, or none.',
-    '# If a cell contains a comma, wrap the whole cell in double quotes.',
+    '# Only `round` and `question` are required. Other columns may be left blank.',
+    '# `round` is a grouping key (1 / 2 / 3 …) — NOT the on-screen round number.',
+    '#   Every row sharing a round number becomes one round. Rounds sort numerically.',
+    '# `round_title` / `subtitle` / `kicker` are per-round — first non-empty one wins.',
+    '#   Leave `kicker` blank and it is filled in automatically.',
+    '# Put TB in the round column for sudden-death tiebreakers — exactly 3 or none.',
     '',
   ].map(csvComment);
   const body = [

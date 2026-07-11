@@ -54,6 +54,35 @@ function useNarrowLayout() {
   return narrow;
 }
 
+// The shared question-writing template, as a Google Sheet. This is the FILE ID
+// from the sheet's normal edit URL:
+//
+//   https://docs.google.com/spreadsheets/d/<FILE_ID>/edit
+//
+// NOT the `2PACX-…` token from a File → Share → Publish-to-web URL: that's a
+// publish handle, and /copy does not accept it.
+//
+// The /copy suffix forces Google's "Make a copy" dialog instead of opening the
+// original, so each writer ends up owning a private copy. That's what keeps the
+// questions private: the template holds no questions, and nobody but its owner
+// can see a copy. Share the template itself "Anyone with the link → Viewer".
+//
+// Seed it with the CSV Template button's download, via
+// File → Import → Upload → Replace spreadsheet, and set Separator type to
+// **Comma** — "Detect automatically" mis-splits the instruction rows, and
+// pasting the CSV in doesn't split it into columns at all.
+//
+// The sheet must be shared "Anyone with the link → Viewer". Publish-to-web is
+// NOT the same thing and does not work here: /copy reads the document's
+// sharing setting, so a published-but-restricted sheet sends writers to a
+// sign-in wall.
+//
+// Empty string = not configured yet; the button hides rather than 404.
+const SHEET_TEMPLATE_ID = '1egPdfvAxmPswOgZznyuYhNzRMXReV95k-D2JpAAtQ7g';
+const SHEET_TEMPLATE_URL = SHEET_TEMPLATE_ID
+  ? `https://docs.google.com/spreadsheets/d/${SHEET_TEMPLATE_ID}/copy`
+  : '';
+
 // A CSV import replaces the whole question set silently otherwise — the draft
 // swaps out with no visible acknowledgement. Spell out what landed so the host
 // can tell a successful import from a no-op.
@@ -652,6 +681,9 @@ function EditorPanel({ rounds, tiebreakers, meta, pastes, commitRounds, commitTi
         <Button onClick={onExport}>Export Deck</Button>
         <Button onClick={onImportClick}>Import…</Button>
         <Button onClick={onDownloadTemplate} secondary>CSV Template</Button>
+        {SHEET_TEMPLATE_URL && (
+          <Button href={SHEET_TEMPLATE_URL} secondary>Google Sheets Template ↗</Button>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -1319,16 +1351,32 @@ function Card({ title, children, compact = false }) {
   );
 }
 
-function Button({ children, onClick, primary = false, secondary = false, disabled = false }) {
+// `href` renders an <a> styled as a button (for links out to Google Sheets);
+// everything else renders a real <button>. Same look either way.
+function Button({ children, onClick, href, primary = false, secondary = false, disabled = false }) {
   const bg = disabled ? COLORS.panelAlt : (primary ? COLORS.accent : (secondary ? 'transparent' : COLORS.panelAlt));
   const color = disabled ? COLORS.textDim : (primary ? COLORS.bg : COLORS.text);
   const border = secondary ? `1px solid ${COLORS.border}` : '1px solid transparent';
+  const style = {
+    padding: '8px 14px', borderRadius: 6, border, background: bg, color,
+    fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+  };
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onClick}
+        style={{ ...style, display: 'inline-block', textDecoration: 'none', lineHeight: '16px' }}
+      >
+        {children}
+      </a>
+    );
+  }
   return (
-    <button onClick={onClick} disabled={disabled} style={{
-      padding: '8px 14px', borderRadius: 6, border, background: bg, color,
-      fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
-      cursor: disabled ? 'not-allowed' : 'pointer',
-    }}>
+    <button onClick={onClick} disabled={disabled} style={style}>
       {children}
     </button>
   );
