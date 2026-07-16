@@ -21,10 +21,11 @@ The deck has **two URLs** that you open in two separate browser windows on the s
 
 | URL | Mode | Where to open it |
 |---|---|---|
+| [`https://fertile-ground-trivia.pages.dev/`](https://fertile-ground-trivia.pages.dev/) | **Display** | The TV / projector / external screen the room watches |
+| [`https://fertile-ground-trivia.pages.dev/#/control`](https://fertile-ground-trivia.pages.dev/#/control) | **Control** | Your laptop screen — editor + presenter view |
 | `http://localhost:5173/` | **Display** | The TV / projector / external screen the room watches |
 | `http://localhost:5173/#/control` | **Control** | Your laptop screen — editor + presenter view |
 
-(Swap in the deployed URL if you're hosting from the published site rather than a local dev server.)
 
 The two windows talk live via `BroadcastChannel` (a built-in browser API; no server). Edits in the control window push to the display instantly; navigating in control drives the display.
 
